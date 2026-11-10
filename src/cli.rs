@@ -23,7 +23,6 @@ pub(crate) mod agent;
 mod api;
 mod completion;
 mod integration;
-mod machine;
 pub(crate) mod notification;
 pub(crate) mod pane;
 pub(crate) mod plugin;
@@ -34,7 +33,6 @@ mod server_not_running;
 mod spec;
 mod status;
 pub(crate) mod tab;
-mod target;
 mod title;
 mod workspace;
 pub(crate) mod workspace_bindings;
@@ -51,6 +49,12 @@ pub(crate) const AGENT_HELP_FOOTER: &str = concat!(
     "  Help a human understand or set up Herdr, or debug a problem with it:\n",
     "    read the source and docs: https://github.com/herdrdev/herdr",
 );
+
+pub(crate) fn caller_pane_id() -> Option<String> {
+    std::env::var("HERDR_PANE_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+}
 
 pub(crate) fn parse_token_assignment(raw: &str) -> Result<(String, Option<String>), String> {
     let Some((key, value)) = raw.split_once('=') else {
@@ -91,10 +95,6 @@ pub(super) fn print_read_response(response: &serde_json::Value) -> std::io::Resu
     Ok(0)
 }
 
-pub(crate) fn maybe_run_machine(args: &[String]) -> Option<std::io::Result<CommandOutcome>> {
-    target::maybe_run(args)
-}
-
 pub fn maybe_run(args: &[String]) -> std::io::Result<CommandOutcome> {
     let Some(command) = args.get(1).map(|arg| arg.as_str()) else {
         return Ok(CommandOutcome::NotCli);
@@ -122,8 +122,6 @@ pub fn maybe_run(args: &[String]) -> std::io::Result<CommandOutcome> {
         "status" => status::run_status_command(&args[2..])?,
         "completion" | "completions" => completion::run_completion_command(&args[2..])?,
         "config" => run_config_command(&args[2..])?,
-        "channel" => run_channel_command(&args[2..])?,
-        "machine" => machine::run_machine_command(&args[2..])?,
         "workspace" => workspace::run_workspace_command(&args[2..])?,
         "worktree" => worktree::run_worktree_command(&args[2..])?,
         "tab" => tab::run_tab_command(&args[2..])?,
@@ -152,136 +150,6 @@ fn api_group(name: &str) -> Option<clap::Command> {
         "plugin" => plugin::command(),
         _ => return None,
     })
-}
-
-fn run_channel_command(args: &[String]) -> std::io::Result<i32> {
-    match args.first().map(|arg| arg.as_str()) {
-        Some("set") => channel_set(&args[1..]),
-        Some("show") if args.len() == 1 => {
-            let config = crate::config::Config::load().config;
-            println!("{}", config.update.channel.as_str());
-            Ok(0)
-        }
-        Some("help" | "--help" | "-h") => {
-            print_channel_help();
-            Ok(0)
-        }
-        _ => {
-            print_channel_help();
-            Ok(2)
-        }
-    }
-}
-
-fn channel_set(args: &[String]) -> std::io::Result<i32> {
-    let Some(channel) = parse_channel_set_arg(args) else {
-        eprintln!("usage: herdr channel set <stable|preview>");
-        return Ok(2);
-    };
-
-    if let Some(reason) = channel_set_rejection(
-        channel,
-        crate::update::preview_channel_rejection_for_current_install(),
-    ) {
-        eprintln!("{reason}.");
-        return Ok(1);
-    }
-
-    let path = crate::config::config_path();
-    let content = if path.exists() {
-        std::fs::read_to_string(&path)?
-    } else {
-        String::new()
-    };
-    if let Err(err) = content.parse::<toml::Value>() {
-        eprintln!(
-            "config file at {} is invalid TOML: {err}. Fix it before changing the update channel.",
-            path.display()
-        );
-        return Ok(1);
-    }
-
-    let updated = crate::config::upsert_section_value(
-        &content,
-        "update",
-        "channel",
-        &format!("\"{channel}\""),
-    );
-    if let Err(err) = updated.parse::<toml::Value>() {
-        eprintln!(
-            "changing the update channel would make {} invalid TOML: {err}; leaving config unchanged",
-            path.display()
-        );
-        return Ok(1);
-    }
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(&path, updated)?;
-    println!(
-        "Herdr update channel set to {channel} in {}.",
-        path.display()
-    );
-
-    match channel_set_install_action(
-        crate::update::package_manager_channel_update_guidance_for_current_install(),
-    ) {
-        ChannelSetInstallAction::PrintGuidance(guidance) => {
-            println!("{guidance}");
-            return Ok(0);
-        }
-        ChannelSetInstallAction::RunSelfUpdate => {}
-    }
-
-    crate::platform::end_cli_output();
-    if let Err(err) = crate::update::self_update(crate::update::SelfUpdateOptions::default()) {
-        eprintln!("update failed: {err}");
-        eprintln!("Run `herdr update` to retry.");
-        return Ok(1);
-    }
-
-    Ok(0)
-}
-
-fn parse_channel_set_arg(args: &[String]) -> Option<&str> {
-    let channel = args.first().map(|arg| arg.as_str())?;
-    if args.len() == 1 && matches!(channel, "stable" | "preview") {
-        Some(channel)
-    } else {
-        None
-    }
-}
-
-fn channel_set_rejection(
-    channel: &str,
-    install_rejection: Option<&'static str>,
-) -> Option<&'static str> {
-    if channel == "preview" {
-        return install_rejection;
-    }
-
-    None
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ChannelSetInstallAction {
-    RunSelfUpdate,
-    PrintGuidance(&'static str),
-}
-
-fn channel_set_install_action(
-    package_manager_guidance: Option<&'static str>,
-) -> ChannelSetInstallAction {
-    match package_manager_guidance {
-        Some(guidance) => ChannelSetInstallAction::PrintGuidance(guidance),
-        None => ChannelSetInstallAction::RunSelfUpdate,
-    }
-}
-
-fn print_channel_help() {
-    eprintln!("herdr channel commands:");
-    eprintln!("  herdr channel show                  print the configured update channel");
-    eprintln!("  herdr channel set <stable|preview>  choose the update channel");
 }
 
 fn run_config_command(args: &[String]) -> std::io::Result<i32> {
@@ -773,7 +641,7 @@ pub(super) fn send_ok_request(method: Method) -> std::io::Result<i32> {
 }
 
 pub(super) fn send_request(request: &Request) -> std::io::Result<serde_json::Value> {
-    let client = target::api_client()?;
+    let client = ApiClient::local();
     ensure_server_protocol_compatible(&client, &request.id)?;
     client
         .request_value(request)
@@ -781,20 +649,20 @@ pub(super) fn send_request(request: &Request) -> std::io::Result<serde_json::Val
 }
 
 pub(super) fn send_request_unchecked(request: &Request) -> std::io::Result<serde_json::Value> {
-    let client = target::api_client()?;
+    let client = ApiClient::local();
     client
         .request_value(request)
         .map_err(|err| map_server_not_running_or_io(err, &request.id, &client))
 }
 
 fn ensure_server_protocol_compatible(client: &ApiClient, request_id: &str) -> std::io::Result<()> {
-    let status = target::server_status(client)
+    let status = client.status()
         .map_err(|err| map_server_not_running_or_io(err, request_id, client))?;
     let server_protocol = status
         .protocol
         .ok_or_else(|| std::io::Error::other("server ping did not include a protocol version"))?;
     let Some(response) =
-        protocol_guard::mismatch_response(request_id, server_protocol, &target::restart_guidance())
+        protocol_guard::mismatch_response(request_id, server_protocol, &crate::session::active_restart_after_update_guidance())
     else {
         return Ok(());
     };
@@ -842,9 +710,6 @@ fn map_server_not_running_or_io(
     request_id: &str,
     client: &ApiClient,
 ) -> std::io::Error {
-    if target::is_remote() {
-        return target::remote_error(api_client_error_to_io(err));
-    }
     match err {
         ApiClientError::Io(io_err) if server_not_running_error(&io_err) => {
             server_not_running::reported_error(server_not_running::response(
@@ -1007,47 +872,6 @@ fn _print_json<T: Serialize>(value: &T) {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn parses_channel_set_argument() {
-        assert_eq!(
-            super::parse_channel_set_arg(&["preview".to_string()]),
-            Some("preview")
-        );
-        assert_eq!(
-            super::parse_channel_set_arg(&["stable".to_string()]),
-            Some("stable")
-        );
-        assert_eq!(super::parse_channel_set_arg(&["nightly".to_string()]), None);
-        assert_eq!(
-            super::parse_channel_set_arg(&["preview".to_string(), "stable".to_string()]),
-            None
-        );
-    }
-
-    #[test]
-    fn channel_set_only_applies_package_rejection_to_preview() {
-        assert_eq!(
-            super::channel_set_rejection("preview", Some("no preview")),
-            Some("no preview")
-        );
-        assert_eq!(
-            super::channel_set_rejection("stable", Some("no preview")),
-            None
-        );
-        assert_eq!(super::channel_set_rejection("preview", None), None);
-    }
-
-    #[test]
-    fn channel_set_skips_self_update_for_package_manager_guidance() {
-        assert_eq!(
-            super::channel_set_install_action(Some("use package manager")),
-            super::ChannelSetInstallAction::PrintGuidance("use package manager")
-        );
-        assert_eq!(
-            super::channel_set_install_action(None),
-            super::ChannelSetInstallAction::RunSelfUpdate
-        );
-    }
 
     #[test]
     fn session_name_parser_accepts_option_terminator() {

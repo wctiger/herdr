@@ -422,22 +422,6 @@ mod tests {
     }
 
     #[test]
-    fn plugin_clap_preserves_remote_path_policy() {
-        crate::cli::target::with_test_client(crate::api::client::ApiClient::local(), || {
-            assert!(matches!(
-                parse(&["link", "relative/path"]),
-                Err(ParseError::Io(_))
-            ));
-            for path in ["/remote/plugin", "C:\\remote\\plugin"] {
-                let (Method::PluginLink(params), _) = parse(&["link", path]).unwrap() else {
-                    panic!("link request");
-                };
-                assert_eq!(params.path, path);
-            }
-        });
-    }
-
-    #[test]
     fn plugin_clap_keeps_hidden_popup_controls_and_help() {
         let mut family = command();
         family.clone().debug_assert();

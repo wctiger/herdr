@@ -31,19 +31,14 @@ use super::{shell, ClientError};
 pub(super) const LOCAL_HANDSHAKE_READ_TIMEOUT: Duration = Duration::from_secs(5);
 pub(super) const REMOTE_HANDSHAKE_READ_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// Remote attach over SSH is not supported in this offline build, so a client
+/// process is always a local client.
 pub(super) fn is_remote_client_process() -> bool {
-    std::env::var(crate::remote::REMOTE_KEYBINDINGS_ENV_VAR).is_ok()
+    false
 }
 
 pub(super) fn client_shell_keybinding_source() -> shell::ClientShellKeybindingSource {
-    match std::env::var(crate::remote::REMOTE_KEYBINDINGS_ENV_VAR)
-        .ok()
-        .as_deref()
-    {
-        Some("server") => shell::ClientShellKeybindingSource::Endpoint,
-        Some(_) => shell::ClientShellKeybindingSource::RemoteLocal,
-        None => shell::ClientShellKeybindingSource::Local,
-    }
+    shell::ClientShellKeybindingSource::Local
 }
 
 pub(super) fn handshake_read_timeout() -> Duration {

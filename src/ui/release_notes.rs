@@ -151,7 +151,12 @@ fn release_notes_preview_line_entries<'a>(
         .fg(p.accent)
         .bg(p.surface0)
         .add_modifier(Modifier::BOLD);
-    let instruction = crate::update::update_install_instruction(install_command);
+    // This offline build has no self-update; installs are done manually.
+    let instruction = if install_command.is_empty() {
+        "Install the new version manually, then restart.".to_string()
+    } else {
+        format!("Run `{install_command}` to install.")
+    };
     let (instruction_width, mut instruction_spans) =
         release_notes_inline_spans(&instruction, text_style, inline_code_style);
     instruction_spans.insert(0, Span::raw(" "));

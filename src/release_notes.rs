@@ -89,8 +89,8 @@ fn release_notes_from_stored(
     }
 
     let preview = match (
-        crate::update::Version::parse(&stored.version),
-        crate::update::Version::parse(current_version),
+        crate::version::Version::parse(&stored.version),
+        crate::version::Version::parse(current_version),
     ) {
         (Some(stored_version), Some(current_version)) => stored_version > current_version,
         _ => false,

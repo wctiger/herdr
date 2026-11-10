@@ -1071,9 +1071,10 @@ mod tests {
         app.state.worktree_directory = worktree_root.clone();
         while app
             .event_tx
-            .try_send(AppEvent::UpdateReady {
-                version: "9.9.9".into(),
-                install_command: "herdr update".into(),
+            .try_send(AppEvent::HookAuthorityCleared {
+                pane_id: crate::layout::PaneId::from_raw(u32::MAX),
+                source: None,
+                seq: None,
             })
             .is_ok()
         {}

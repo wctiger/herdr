@@ -470,7 +470,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             params.caller_pane_id = super::caller_target(
                 matches,
                 params.caller_pane_id,
-                crate::cli::target::caller_pane_id().as_deref(),
+                crate::cli::caller_pane_id().as_deref(),
                 true,
                 false,
             )?;
@@ -496,7 +496,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             params.pane_id = super::caller_target(
                 matches,
                 params.pane_id,
-                crate::cli::target::caller_pane_id().as_deref(),
+                crate::cli::caller_pane_id().as_deref(),
                 false,
                 false,
             )?;
@@ -514,7 +514,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             params.pane_id = super::caller_target(
                 matches,
                 params.pane_id,
-                crate::cli::target::caller_pane_id().as_deref(),
+                crate::cli::caller_pane_id().as_deref(),
                 false,
                 false,
             )?;
@@ -540,7 +540,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             params.pane_id = super::caller_target(
                 matches,
                 params.pane_id,
-                crate::cli::target::caller_pane_id().as_deref(),
+                crate::cli::caller_pane_id().as_deref(),
                 false,
                 false,
             )?;
@@ -604,7 +604,7 @@ pub(super) const LEAVES: &[Leaf] = &[
         method: |matches| {
             let mut params = PaneInputProjection::from_matches(matches)?;
             if matches.get_flag("current") {
-                params.pane_id = crate::cli::target::caller_pane_id()
+                params.pane_id = crate::cli::caller_pane_id()
                     .map(|value| crate::cli::normalize_pane_id(&value))
                     .ok_or_else(|| ParseError::Usage("--current requires HERDR_PANE_ID".into()))?;
             }
@@ -622,7 +622,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             params.target_pane_id = super::caller_target(
                 matches,
                 params.target_pane_id,
-                crate::cli::target::caller_pane_id().as_deref(),
+                crate::cli::caller_pane_id().as_deref(),
                 true,
                 true,
             )?;

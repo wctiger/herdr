@@ -6685,9 +6685,10 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(1);
         let pane_id = PaneId::from_raw(42);
 
-        tx.try_send(AppEvent::UpdateReady {
-            version: "9.9.9".into(),
-            install_command: "herdr update".into(),
+        tx.try_send(AppEvent::HookAuthorityCleared {
+            pane_id: crate::layout::PaneId::from_raw(u32::MAX),
+            source: None,
+            seq: None,
         })
         .unwrap();
 
@@ -6716,7 +6717,7 @@ mod tests {
             .await
             .expect("queue should yield first event")
             .expect("sender still alive");
-        assert!(matches!(first, AppEvent::UpdateReady { .. }));
+        assert!(matches!(first, AppEvent::HookAuthorityCleared { .. }));
 
         tokio::time::timeout(std::time::Duration::from_millis(50), async {
             (&mut publish).await;

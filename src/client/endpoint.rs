@@ -9,7 +9,6 @@ mod control;
 mod health;
 mod message_policy;
 mod registry;
-mod ssh_metadata;
 mod supervisor;
 mod writer;
 
@@ -18,7 +17,6 @@ pub(crate) use catalog::*;
 pub(crate) use control::*;
 pub(crate) use message_policy::*;
 pub(crate) use registry::*;
-pub(crate) use ssh_metadata::{SshMachineMetadata, SshMetadataCache};
 pub(crate) use supervisor::*;
 pub(crate) use writer::NativeEndpointTransport;
 
