@@ -3321,7 +3321,7 @@ mod tests {
         use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
         use windows_sys::Win32::Storage::FileSystem::PIPE_ACCESS_DUPLEX;
         use windows_sys::Win32::System::Pipes::CreateNamedPipeW;
-        let path = std::path::PathBuf::from(format!("sy-term-busy-{}", std::process::id()));
+        let path = std::path::PathBuf::from(format!("syt-busy-{}", std::process::id()));
         let name = super::wide_null(&format!(r"\\.\pipe\{}", path.display()));
         let handle = unsafe {
             CreateNamedPipeW(
@@ -3384,8 +3384,7 @@ mod tests {
         };
         use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
-        let path =
-            std::env::temp_dir().join(format!("sy-term-user-pipe-{}.sock", std::process::id()));
+        let path = std::env::temp_dir().join(format!("syt-user-pipe-{}.sock", std::process::id()));
         let listener = crate::ipc::bind_local_listener(&path).unwrap();
         let mut raw_token = std::ptr::null_mut();
         assert_ne!(
@@ -3925,7 +3924,7 @@ mod tests {
         }
 
         let base = std::env::temp_dir().join(format!(
-            "sy-term-wmi-daemon-test-{}-{}",
+            "syt-wmi-daemon-test-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -4108,10 +4107,8 @@ mod tests {
 
     #[test]
     fn detached_custom_command_preserves_quoted_command_tail() {
-        let path = std::env::temp_dir().join(format!(
-            "sy-term-raw-command-quotes-{}.txt",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("syt-raw-command-quotes-{}.txt", std::process::id()));
         let command = format!(r#"echo "hi" > "{}""#, path.display());
 
         let status = super::detached_custom_command_process_platform(&command)
@@ -4130,7 +4127,7 @@ mod tests {
         use std::io::{Read, Write};
         use std::path::PathBuf;
 
-        let name = format!("sy-term-Cwd-Case-{}", std::process::id());
+        let name = format!("syt-Cwd-Case-{}", std::process::id());
         let cwd = std::env::temp_dir().join(&name);
         fs::create_dir_all(&cwd).expect("create cwd fixture");
         let cwd = super::normalize_cwd_for_launch_platform(&cwd);
@@ -4185,7 +4182,7 @@ mod tests {
             };
             writeln!(child.stdin.as_ref().unwrap(), "echo sy-term-cwd-ready\r")
                 .expect("check cmd readiness");
-            let ready = wait_for(b"sy-term-cwd-ready");
+            let ready = wait_for(b"syt-cwd-ready");
             let initial = super::process_cwd(child.id());
             writeln!(
                 child.stdin.as_ref().unwrap(),
@@ -4193,7 +4190,7 @@ mod tests {
                 changed.display()
             )
             .expect("change cmd cwd");
-            let cd_completed = wait_for(b"sy-term-cwd-changed");
+            let cd_completed = wait_for(b"syt-cwd-changed");
             let after_cd = super::process_cwd(child.id());
             let pane_cwd = super::pane_process_cwd(child.id());
             let _ = child.kill();
@@ -5360,7 +5357,7 @@ mod tests {
     #[test]
     fn pane_runtime_marker_is_added_only_to_git_bash_environment() {
         let root = std::env::temp_dir().join(format!(
-            "sy-term-git-bash-test-{}",
+            "syt-git-bash-test-{}",
             super::next_pane_runtime_marker()
         ));
         fs::create_dir_all(root.join("bin")).expect("create Git Bash bin fixture");

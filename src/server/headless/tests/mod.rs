@@ -3334,7 +3334,7 @@ async fn worktree_discovery_does_not_block_client_typing() {
     let (runtime, mut input_rx) =
         crate::terminal::TerminalRuntime::test_with_channel_and_scrollback_bytes(80, 24, 0, b"", 4);
     workspace.insert_test_runtime(pane_id, runtime);
-    let repo = std::env::temp_dir().join(format!("sy-term-blocked-git-{}", workspace.id));
+    let repo = std::env::temp_dir().join(format!("syt-blocked-git-{}", workspace.id));
     workspace.identity_cwd = repo.clone();
     workspace.cached_git_space = Some(crate::workspace::GitSpaceMetadata {
         key: repo.display().to_string(),
@@ -3434,7 +3434,7 @@ async fn worktree_discovery_does_not_block_client_typing() {
 async fn deferred_worktree_open_disconnect_keeps_other_clients_focus() {
     let mut server = test_headless_server();
     let mut source = crate::workspace::Workspace::test_new("pending-open-source");
-    let repo = std::env::temp_dir().join(format!("sy-term-disconnected-open-{}", source.id));
+    let repo = std::env::temp_dir().join(format!("syt-disconnected-open-{}", source.id));
     let checkout = repo.with_extension("checkout");
     let git = |args: &[&str]| {
         let output = std::process::Command::new("git")
@@ -5017,7 +5017,7 @@ fn windows_shutdown_probe_preserves_panes_and_agent_sessions() {
             .map(|key| (key, std::env::var_os(key))),
     );
     let config_home = std::env::temp_dir().join(format!(
-        "sy-term-shutdown-{}-{}",
+        "syt-shutdown-{}-{}",
         std::process::id(),
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -5380,7 +5380,7 @@ fn terminal_attach_client_exits_when_worktree_runtime_restore_fails() {
 #[test]
 fn terminal_attach_client_exits_when_worktree_remove_succeeds() {
     let mut server = test_headless_server();
-    let checkout = PathBuf::from("/repo/sy-term-issue");
+    let checkout = PathBuf::from("/repo/syt-issue");
     let parent = crate::workspace::Workspace::test_new("parent");
     let mut workspace = crate::workspace::Workspace::test_new("worktree");
     workspace.worktree_space = Some(crate::workspace::WorktreeSpaceMembership {

@@ -1447,7 +1447,7 @@ mod tests {
         }
         #[cfg(windows)]
         {
-            std::env::temp_dir().join(format!("sy-term-{name}-{filename}"))
+            std::env::temp_dir().join(format!("syt-{name}-{filename}"))
         }
     }
 

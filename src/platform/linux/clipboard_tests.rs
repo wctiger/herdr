@@ -2,10 +2,8 @@ use super::*;
 use std::time::{Duration, Instant};
 
 fn hung_helper(case: &str) {
-    let marker = std::env::temp_dir().join(format!(
-        "sy-term-clipboard-hang-{}-{case}",
-        std::process::id()
-    ));
+    let marker =
+        std::env::temp_dir().join(format!("syt-clipboard-hang-{}-{case}", std::process::id()));
     let script = format!("echo $$ > '{}'; {case}", marker.display());
     let (cancel, watchdog) = std::sync::mpsc::channel();
     let watchdog_marker = marker.clone();
@@ -85,7 +83,7 @@ impl ForkingHelper {
     fn new(script: &str) -> Self {
         use std::os::unix::fs::PermissionsExt;
         let directory = std::env::temp_dir().join(format!(
-            "sy-term-forking-clipboard-{}-{}",
+            "syt-forking-clipboard-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

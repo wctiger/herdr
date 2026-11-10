@@ -498,16 +498,16 @@ mod tests {
 
     #[test]
     fn activation_requires_exact_scheme_window_and_full_issued_token_shape() {
-        let scheme = "sy-term-notification-test";
+        let scheme = "syt-notification-test";
         let token = 0x0123456789abcdef_fedcba9876543210u128;
         let uri = format!("{scheme}://1a/{token:032x}");
         assert_eq!(parse_activation(&uri, scheme), Some((0x1a, token)));
         for invalid in [
             "other://1a/0123456789abcdeffedcba9876543210",
-            "sy-term-notification-test://0/0123456789abcdeffedcba9876543210",
-            "sy-term-notification-test://1a/123",
-            "sy-term-notification-test://1a/0123456789abcdeffedcba9876543210/extra",
-            "sy-term-notification-test://1a/+123456789abcdeffedcba9876543210",
+            "syt-notification-test://0/0123456789abcdeffedcba9876543210",
+            "syt-notification-test://1a/123",
+            "syt-notification-test://1a/0123456789abcdeffedcba9876543210/extra",
+            "syt-notification-test://1a/+123456789abcdeffedcba9876543210",
         ] {
             assert_eq!(parse_activation(invalid, scheme), None, "{invalid}");
         }
@@ -517,8 +517,7 @@ mod tests {
     fn notification_text_remains_literal_xml_and_unicode() {
         let _apartment = ComApartment::new().expect("COM");
         let title = "Agent <done> & 😀";
-        let xml =
-            notification_xml(title, Some("body & <tag>"), "sy-term-test://1/123").expect("XML");
+        let xml = notification_xml(title, Some("body & <tag>"), "syt-test://1/123").expect("XML");
         let texts = xml
             .GetElementsByTagName(&HSTRING::from("text"))
             .expect("texts");

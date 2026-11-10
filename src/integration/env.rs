@@ -296,7 +296,7 @@ mod tests {
     fn opencode_state_dir_honors_xdg_state_home() {
         let _lock = integration_env_lock();
         let original = std::env::var_os("XDG_STATE_HOME");
-        let xdg = std::env::temp_dir().join("sy-term-xdg-state");
+        let xdg = std::env::temp_dir().join("syt-xdg-state");
         std::env::set_var("XDG_STATE_HOME", &xdg);
         assert_eq!(opencode_state_dir().unwrap(), xdg.join("opencode"));
         match original {

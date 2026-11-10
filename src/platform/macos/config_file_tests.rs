@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn config_replacement_preserves_macos_acl() {
-    let dir = std::env::temp_dir().join(format!("sy-term-config-acl-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("syt-config-acl-{}", std::process::id()));
     std::fs::create_dir(&dir).unwrap();
     let source = dir.join("source");
     let temporary = dir.join("temporary");

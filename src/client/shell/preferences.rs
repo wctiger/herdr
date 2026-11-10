@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn concurrent_stores_leave_complete_preferences() {
         let path = std::env::temp_dir().join(format!(
-            "sy-term-shell-concurrent-preferences-{}.json",
+            "syt-shell-concurrent-preferences-{}.json",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&path);
@@ -154,10 +154,8 @@ mod tests {
 
     #[test]
     fn repeated_store_replaces_existing_preferences() {
-        let path = std::env::temp_dir().join(format!(
-            "sy-term-shell-preferences-{}.json",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("syt-shell-preferences-{}.json", std::process::id()));
         let _ = std::fs::remove_file(&path);
         store(
             &path,

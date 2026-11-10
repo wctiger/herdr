@@ -1727,10 +1727,8 @@ mod tests {
             .duration_since(SystemTime::UNIX_EPOCH)
             .expect("system time should follow unix epoch")
             .as_nanos();
-        let temp_dir = std::env::temp_dir().join(format!(
-            "sy-term-fake-wl-copy-{}-{unique}",
-            std::process::id()
-        ));
+        let temp_dir =
+            std::env::temp_dir().join(format!("syt-fake-wl-copy-{}-{unique}", std::process::id()));
         std::fs::create_dir_all(&temp_dir).expect("temp dir should be created");
         let mut cleanup = Cleanup {
             old_path: std::env::var_os("PATH"),
@@ -1884,7 +1882,7 @@ mod tests {
             .expect("system time should follow unix epoch")
             .as_nanos();
         let temp_dir = std::env::temp_dir().join(format!(
-            "sy-term-failed-wl-copy-{}-{unique}",
+            "syt-failed-wl-copy-{}-{unique}",
             std::process::id()
         ));
         std::fs::create_dir_all(&temp_dir).expect("temp dir should be created");
@@ -2019,8 +2017,7 @@ mod tests {
     #[test]
     fn read_clipboard_image_rejects_xclip_text_served_for_image_target() {
         let _guard = env_lock().lock().unwrap();
-        let temp_dir =
-            std::env::temp_dir().join(format!("sy-term-fake-xclip-{}", std::process::id()));
+        let temp_dir = std::env::temp_dir().join(format!("syt-fake-xclip-{}", std::process::id()));
         std::fs::create_dir_all(&temp_dir).expect("temp dir should be created");
         let fake_xclip = temp_dir.join("xclip");
         std::fs::write(&fake_xclip, "#!/bin/sh\nprintf '# Tasks'\n")
@@ -2072,7 +2069,7 @@ mod tests {
     fn read_clipboard_image_rejects_wayland_xclip_fallback_text_for_image_target() {
         let _guard = env_lock().lock().unwrap();
         let temp_dir =
-            std::env::temp_dir().join(format!("sy-term-fake-wayland-xclip-{}", std::process::id()));
+            std::env::temp_dir().join(format!("syt-fake-wayland-xclip-{}", std::process::id()));
         std::fs::create_dir_all(&temp_dir).expect("temp dir should be created");
         let fake_wl_paste = temp_dir.join("wl-paste");
         let fake_xclip = temp_dir.join("xclip");
@@ -2199,7 +2196,7 @@ mod tests {
         }
 
         let path =
-            std::env::temp_dir().join(format!("sy-term-notify-send-args-{}", std::process::id()));
+            std::env::temp_dir().join(format!("syt-notify-send-args-{}", std::process::id()));
         let script = "printf '%s\\n' \"$@\" > \"$HERDR_NOTIFY_ARGS\"";
         let shown = show_desktop_notification_with_command("-danger", Some("body"), |_| {
             let mut cmd = Command::new("sh");

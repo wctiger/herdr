@@ -642,7 +642,7 @@ fn pane_read_rejects_invalid_value_with_usage_error() {
     // Invalid option values fail as CLI usage errors before any server
     // contact: exit 2 with the plain parser message, not the old
     // `Error: Custom { ... }` io::Error wrapper from main.
-    let socket_path = Path::new("/tmp/sy-term-cli-invalid-values-no-server.sock");
+    let socket_path = Path::new("/tmp/syt-cli-invalid-values-no-server.sock");
 
     let read = run_cli(socket_path, &["pane", "read", "w1:p1", "--source", "bogus"]);
     assert_eq!(read.status.code(), Some(2));

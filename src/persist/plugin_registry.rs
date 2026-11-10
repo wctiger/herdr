@@ -169,7 +169,7 @@ mod tests {
             .unwrap_or(0);
         std::env::temp_dir()
             .join(format!(
-                "sy-term-registry-{name}-{}-{nanos}",
+                "syt-registry-{name}-{}-{nanos}",
                 std::process::id()
             ))
             .join("plugins.json")

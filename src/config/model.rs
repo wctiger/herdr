@@ -1463,10 +1463,10 @@ tab_bar_right_separator = " · "
 
         let toml = r#"
 [worktrees]
-directory = "~/Projects/sy-term-worktrees"
+directory = "~/Projects/syt-worktrees"
 "#;
         let config: Config = toml::from_str(toml).unwrap();
-        assert_eq!(config.worktrees.directory, "~/Projects/sy-term-worktrees");
+        assert_eq!(config.worktrees.directory, "~/Projects/syt-worktrees");
     }
 
     #[test]

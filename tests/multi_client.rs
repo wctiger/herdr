@@ -28,7 +28,7 @@ fn unique_test_dir() -> PathBuf {
         .unwrap()
         .as_nanos();
     PathBuf::from(format!(
-        "/tmp/sy-term-multi-client-{}-{nanos}",
+        "/tmp/syt-multi-client-{}-{nanos}",
         std::process::id()
     ))
 }

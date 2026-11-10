@@ -3040,7 +3040,7 @@ mod tests {
             key: "repo-key".into(),
             label: "sy-term".into(),
             repo_root: "/repo/sy-term".into(),
-            checkout_path: "/repo/sy-term-issue".into(),
+            checkout_path: "/repo/syt-issue".into(),
             is_linked_worktree: true,
         });
         app
@@ -3056,7 +3056,7 @@ mod tests {
                         .or_insert_with(|| {
                             crate::terminal::TerminalState::new(
                                 pane.attached_terminal_id.clone(),
-                                std::path::PathBuf::from("/sy-term-test"),
+                                std::path::PathBuf::from("/syt-test"),
                             )
                         });
                 }

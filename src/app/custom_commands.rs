@@ -735,7 +735,7 @@ mod tests {
     fn shell_command_invocation_executes_endpoint_owned_definition() {
         let mut app = test_app();
         let path = std::path::PathBuf::from(format!(
-            "/var/tmp/sy-term-command-invoke-{}-{}",
+            "/var/tmp/syt-command-invoke-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

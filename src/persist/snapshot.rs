@@ -1069,7 +1069,7 @@ mod tests {
     async fn capture_prefers_live_shell_cwd_and_keeps_it_after_exit() {
         let old = std::env::current_dir().unwrap();
         let new = std::env::temp_dir().join(format!(
-            "sy-term-persist-cwd-{}-{}",
+            "syt-persist-cwd-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

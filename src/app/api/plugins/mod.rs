@@ -965,7 +965,7 @@ action = "open"
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        std::env::temp_dir().join(format!("sy-term-{name}-{}-{nanos}", std::process::id()))
+        std::env::temp_dir().join(format!("syt-{name}-{}-{nanos}", std::process::id()))
     }
 
     fn canonical_path_string(path: &std::path::Path) -> String {
@@ -1663,7 +1663,7 @@ platforms = ["linux", "macos"]
         let where_exe = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap())
             .join("System32/where.exe");
         std::fs::copy(where_exe, &long_where).unwrap();
-        let where_probe = "sy-term-long-path-probe.exe";
+        let where_probe = "syt-long-path-probe.exe";
         std::fs::write(child_cwd.join(where_probe), b"").unwrap();
         assert!(
             root.as_os_str().encode_wide().count()
@@ -3194,12 +3194,12 @@ command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
             key: "repo-key".into(),
             label: "sy-term".into(),
             repo_root: "/repo/sy-term".into(),
-            checkout_path: "/repo/sy-term-issue".into(),
+            checkout_path: "/repo/syt-issue".into(),
             is_linked_worktree: true,
         });
         let workspace = app.workspace_info(0);
         let worktree = crate::api::schema::WorktreeInfo {
-            path: "/repo/sy-term-issue".into(),
+            path: "/repo/syt-issue".into(),
             branch: Some("worktree/issue".into()),
             is_bare: false,
             is_detached: false,
@@ -3212,7 +3212,7 @@ command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
             key: "repo-key".into(),
             label: "sy-term".into(),
             repo_root: "/repo/sy-term".into(),
-            checkout_path: "/repo/sy-term-other".into(),
+            checkout_path: "/repo/syt-other".into(),
             is_linked_worktree: true,
         });
         let changed_context = app.plugin_context_for_event(
@@ -3232,7 +3232,7 @@ command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
                 .worktree
                 .as_ref()
                 .map(|worktree| worktree.checkout_path.as_str()),
-            Some("/repo/sy-term-issue")
+            Some("/repo/syt-issue")
         );
 
         app.state.workspaces.clear();
@@ -3257,7 +3257,7 @@ command = ["sh", "-c", "printf '%s' \"$HERDR_PLUGIN_CONTEXT_JSON\" > {}"]
                 .worktree
                 .as_ref()
                 .map(|worktree| worktree.checkout_path.as_str()),
-            Some("/repo/sy-term-issue")
+            Some("/repo/syt-issue")
         );
     }
 
@@ -3478,7 +3478,7 @@ action = "missing"
             key: "repo-key".into(),
             label: "sy-term".into(),
             repo_root: "/repo/sy-term".into(),
-            checkout_path: "/repo/sy-term-issue".into(),
+            checkout_path: "/repo/syt-issue".into(),
             is_linked_worktree: true,
         });
         let pane_id = app.state.workspaces[0].tabs[0].root_pane;
@@ -3557,7 +3557,7 @@ command = ["show-ctx"]
         assert_eq!(worktree.repo_key, "repo-key");
         assert_eq!(worktree.repo_name, "sy-term");
         assert_eq!(worktree.repo_root, "/repo/sy-term");
-        assert_eq!(worktree.checkout_path, "/repo/sy-term-issue");
+        assert_eq!(worktree.checkout_path, "/repo/syt-issue");
         assert!(worktree.is_linked_worktree);
 
         let _ = std::fs::remove_dir_all(root);

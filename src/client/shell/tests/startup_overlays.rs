@@ -372,7 +372,7 @@ fn startup_onboarding_shows_configured_prefix() {
 #[test]
 fn onboarding_completion_persists_and_opens_endpoint_integrations() {
     let path = std::env::temp_dir().join(format!(
-        "sy-term-client-onboarding-{}-{}.toml",
+        "syt-client-onboarding-{}-{}.toml",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -479,7 +479,7 @@ fn unavailable_integration_list_does_not_wedge_settings() {
     let mut config =
         ClientShellConfig::from_config(&Config::default()).with_startup_onboarding(true);
     config.local_config_path = std::env::temp_dir().join(format!(
-        "sy-term-client-onboarding-unavailable-{}-{}.toml",
+        "syt-client-onboarding-unavailable-{}-{}.toml",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

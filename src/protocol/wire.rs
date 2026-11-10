@@ -2801,7 +2801,7 @@ mod tests {
             server_keybindings_toml: Some("[keys]\nprefix = \"ctrl+a\"\n".into()),
             latest_release_notes_available: true,
             integration_updates_available: true,
-            worktree_directory: "/tmp/sy-term-worktrees".into(),
+            worktree_directory: "/tmp/syt-worktrees".into(),
             release_notes: Some(ClientShellReleaseNotes {
                 version: "0.8.3".into(),
                 body: "### New\n- Update ready".into(),
