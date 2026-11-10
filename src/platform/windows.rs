@@ -4182,7 +4182,7 @@ mod tests {
             };
             writeln!(child.stdin.as_ref().unwrap(), "echo sy-term-cwd-ready\r")
                 .expect("check cmd readiness");
-            let ready = wait_for(b"syt-cwd-ready");
+            let ready = wait_for(b"sy-term-cwd-ready");
             let initial = super::process_cwd(child.id());
             writeln!(
                 child.stdin.as_ref().unwrap(),
@@ -4190,7 +4190,7 @@ mod tests {
                 changed.display()
             )
             .expect("change cmd cwd");
-            let cd_completed = wait_for(b"syt-cwd-changed");
+            let cd_completed = wait_for(b"sy-term-cwd-changed");
             let after_cd = super::process_cwd(child.id());
             let pane_cwd = super::pane_process_cwd(child.id());
             let _ = child.kill();
