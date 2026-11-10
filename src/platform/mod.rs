@@ -555,9 +555,6 @@ pub(crate) use client_state::{replace_file, sync_parent_directory};
 #[cfg(not(unix))]
 pub(crate) fn begin_cli_output() {}
 
-#[cfg(not(unix))]
-pub(crate) fn end_cli_output() {}
-
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(target_os = "linux")]
@@ -1030,15 +1027,4 @@ mod tests {
             LimitedRead::Complete(b"image".to_vec())
         );
     }
-}
-
-#[cfg(not(unix))]
-pub(crate) fn shared_ssh_control_path(
-    _namespace: &std::path::Path,
-    _target: &str,
-) -> std::io::Result<std::path::PathBuf> {
-    Err(std::io::Error::new(
-        std::io::ErrorKind::Unsupported,
-        "interactive SSH recovery requires Unix OpenSSH multiplexing",
-    ))
 }

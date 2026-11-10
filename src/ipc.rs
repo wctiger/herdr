@@ -11,7 +11,7 @@ pub(crate) type LocalListener = interprocess::local_socket::Listener;
 pub(crate) type LocalStream = interprocess::local_socket::Stream;
 #[cfg(all(unix, test))]
 type PrivateLocalListener = LocalListener;
-#[cfg(windows)]
+#[cfg(all(windows, test))]
 type PrivateLocalListener = crate::platform::PrivateLocalListener;
 
 pub(crate) enum LocalStreamRead {

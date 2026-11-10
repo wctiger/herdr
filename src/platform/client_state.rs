@@ -1,10 +1,5 @@
 use std::path::Path;
 
-#[cfg(windows)]
-pub(crate) fn create_private_state_file(path: &Path) -> std::io::Result<std::fs::File> {
-    super::windows::create_remote_ssh_config_file(path)
-}
-
 #[cfg(not(windows))]
 pub(crate) fn replace_file(source: &Path, destination: &Path) -> std::io::Result<()> {
     std::fs::rename(source, destination)
