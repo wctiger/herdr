@@ -100,7 +100,7 @@ jobs:
 
       - name: Package artifact
         run: |
-          cp target/${{ matrix.target }}/release/herdr ${{ matrix.name }}
+          cp target/${{ matrix.target }}/release/sy-term ${{ matrix.name }}
           file ${{ matrix.name }} > BUILD_INFO.txt
           ldd ${{ matrix.name }} 2>&1 | tee -a BUILD_INFO.txt
           grep -q "statically linked" BUILD_INFO.txt
@@ -169,7 +169,7 @@ jobs:
 
       - name: Package artifact
         run: |
-          cp target/${{ matrix.target }}/release/herdr ${{ matrix.name }}
+          cp target/${{ matrix.target }}/release/sy-term ${{ matrix.name }}
           file ${{ matrix.name }} > BUILD_INFO.txt
           {
             echo "commit=$GITHUB_SHA"
