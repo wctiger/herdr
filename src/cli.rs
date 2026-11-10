@@ -656,14 +656,17 @@ pub(super) fn send_request_unchecked(request: &Request) -> std::io::Result<serde
 }
 
 fn ensure_server_protocol_compatible(client: &ApiClient, request_id: &str) -> std::io::Result<()> {
-    let status = client.status()
+    let status = client
+        .status()
         .map_err(|err| map_server_not_running_or_io(err, request_id, client))?;
     let server_protocol = status
         .protocol
         .ok_or_else(|| std::io::Error::other("server ping did not include a protocol version"))?;
-    let Some(response) =
-        protocol_guard::mismatch_response(request_id, server_protocol, &crate::session::active_restart_after_update_guidance())
-    else {
+    let Some(response) = protocol_guard::mismatch_response(
+        request_id,
+        server_protocol,
+        &crate::session::active_restart_after_update_guidance(),
+    ) else {
         return Ok(());
     };
 
@@ -750,25 +753,6 @@ pub(super) fn parse_u64_flag(flag: &str, value: &str) -> std::io::Result<u64> {
     value
         .parse::<u64>()
         .map_err(|_| std::io::Error::other(format!("invalid value for {flag}: {value}")))
-}
-
-/// Expand `--flag=value` tokens into separate `--flag` and `value` tokens so
-/// the hand-rolled subcommand parsers accept the same `--flag=value` form the
-/// clap-generated help and completions imply. Only `value_options` are split:
-/// boolean and unknown options keep their attached value so they still reach
-/// the parser's unknown-option branch.
-pub(super) fn expand_equals_args(args: &[String], value_options: &[&str]) -> Vec<String> {
-    let mut expanded = Vec::with_capacity(args.len());
-    for arg in args {
-        match arg.split_once('=') {
-            Some((flag, value)) if value_options.contains(&flag) => {
-                expanded.push(flag.to_string());
-                expanded.push(value.to_string());
-            }
-            _ => expanded.push(arg.clone()),
-        }
-    }
-    expanded
 }
 
 fn parse_session_json_only(args: &[String], usage: &str) -> Result<bool, i32> {
@@ -868,6 +852,26 @@ fn print_session_help() {
 
 fn _print_json<T: Serialize>(value: &T) {
     println!("{}", serde_json::to_string(value).unwrap());
+}
+
+#[cfg(test)]
+/// Expand `--flag=value` tokens into separate `--flag` and `value` tokens so
+/// the hand-rolled subcommand parsers accept the same `--flag=value` form the
+/// clap-generated help and completions imply. Only `value_options` are split:
+/// boolean and unknown options keep their attached value so they still reach
+/// the parser's unknown-option branch.
+pub(super) fn expand_equals_args(args: &[String], value_options: &[&str]) -> Vec<String> {
+    let mut expanded = Vec::with_capacity(args.len());
+    for arg in args {
+        match arg.split_once('=') {
+            Some((flag, value)) if value_options.contains(&flag) => {
+                expanded.push(flag.to_string());
+                expanded.push(value.to_string());
+            }
+            _ => expanded.push(arg.clone()),
+        }
+    }
+    expanded
 }
 
 #[cfg(test)]

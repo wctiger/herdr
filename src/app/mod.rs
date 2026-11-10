@@ -492,7 +492,6 @@ impl App {
             update_available: None,
             update_install_command: String::new(),
             latest_release_notes_available,
-            update_dismissed: false,
             config_diagnostic,
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
@@ -531,7 +530,6 @@ impl App {
             host_terminal_appearance_explicit: false,
             integration_recommendations: crate::integration::integration_recommendations(),
             agent_manifest_summaries,
-            agent_manifest_update_status: crate::detect::manifest_update::load_status(),
             installed_plugins: load_plugin_registry(
                 policy.persist_plugin_registry,
                 &mut plugin_installation_leases,
@@ -1005,14 +1003,6 @@ mod tests {
         std::env::temp_dir().join(unique).join("config.toml")
     }
 
-    fn restore_xdg_state_home(original: Option<std::ffi::OsString>) {
-        if let Some(value) = original {
-            std::env::set_var("XDG_STATE_HOME", value);
-        } else {
-            std::env::remove_var("XDG_STATE_HOME");
-        }
-    }
-
     #[test]
     fn git_refresh_deadline_is_suppressed_while_in_flight() {
         let mut app = test_app();
@@ -1260,7 +1250,7 @@ mod tests {
     #[test]
     fn internal_event_drain_limits_work_per_tick() {
         let mut app = test_app();
-        for i in 0..=APP_EVENT_DRAIN_LIMIT {
+        for _ in 0..=APP_EVENT_DRAIN_LIMIT {
             app.event_tx
                 .try_send(AppEvent::HookAuthorityCleared {
                     pane_id: crate::layout::PaneId::from_raw(u32::MAX),
@@ -1279,7 +1269,7 @@ mod tests {
     #[test]
     fn api_request_drains_all_pending_internal_events_before_reading_state() {
         let mut app = test_app();
-        for i in 0..=APP_EVENT_DRAIN_LIMIT {
+        for _ in 0..=APP_EVENT_DRAIN_LIMIT {
             app.event_tx
                 .try_send(AppEvent::HookAuthorityCleared {
                     pane_id: crate::layout::PaneId::from_raw(u32::MAX),
@@ -1525,92 +1515,6 @@ mod tests {
 
         assert_eq!(app.state.mode, Mode::Navigate);
         assert!(app.state.latest_release_notes_available);
-
-        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
-    }
-
-    #[test]
-    fn reload_config_updates_live_state() {
-        let _guard = config_env_lock().lock().unwrap();
-        let path = temp_config_path("reload-config-success");
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(
-            &path,
-            "[terminal]\ndefault_shell = \"nu\"\nshell_mode = \"non_login\"\nnew_cwd = \"home\"\n[keys]\nnew_workspace = \"prefix+m\"\nprefix = \"ctrl+a\"\n[update]\nversion_check = false\nmanifest_check = false\n[server]\nheadless_cols = 160\nheadless_rows = 50\n[ui]\nagent_panel_sort = \"priority\"\n[ui.toast]\ndelivery = \"herdr\"\n",
-        )
-        .unwrap();
-        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
-
-        let mut app = test_app();
-        app.next_auto_update_check = Some(Instant::now());
-        app.next_agent_manifest_update_check = Some(Instant::now());
-        let report = app.reload_config();
-
-        assert_eq!(report.status, crate::config::ConfigReloadStatus::Applied);
-        assert_eq!(app.state.headless_size, (160, 50));
-        assert_eq!(
-            app.state.prefix_keys,
-            vec![(KeyCode::Char('a'), KeyModifiers::CONTROL)]
-        );
-        assert!(app
-            .state
-            .keybinds
-            .new_workspace
-            .matches_prefix(&KeyEvent::new(KeyCode::Char('m'), KeyModifiers::empty())));
-        assert_eq!(
-            app.state.toast_config.delivery,
-            crate::config::ToastDelivery::Herdr
-        );
-        assert_eq!(app.state.agent_panel_sort, state::AgentPanelSort::Priority);
-        let report = app.reload_config();
-        assert_eq!(report.status, crate::config::ConfigReloadStatus::Applied);
-        assert!(app.state.request_client_config_reload);
-        assert_eq!(app.state.default_shell, "nu");
-        assert_eq!(
-            app.state.shell_mode,
-            crate::config::ShellModeConfig::NonLogin
-        );
-        assert_eq!(
-            app.state.new_terminal_cwd,
-            crate::config::NewTerminalCwdConfig::Home
-        );
-        assert!(!app.update_version_check_enabled);
-        assert!(!app.update_manifest_check_enabled);
-        assert!(app.next_auto_update_check.is_none());
-        assert!(app.next_agent_manifest_update_check.is_none());
-        assert!(app.state.config_diagnostic.is_none());
-        let toast = app.state.toast.as_ref().unwrap();
-        assert_eq!(toast.kind, crate::app::state::ToastKind::UpdateInstalled);
-        assert_eq!(toast.title, "reloaded config");
-        assert_eq!(toast.context, "using config.toml");
-
-        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
-    }
-
-    #[test]
-    fn reload_config_keeps_kitty_graphics_until_restart() {
-        let _guard = config_env_lock().lock().unwrap();
-        let path = temp_config_path("reload-config-kitty-graphics");
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(&path, "[terminal]\nkitty_graphics = false\n").unwrap();
-        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
-
-        let mut app = test_app();
-        assert!(app.state.kitty_graphics_enabled);
-
-        let report = app.reload_config();
-
-        assert_eq!(report.status, crate::config::ConfigReloadStatus::Partial);
-        assert!(app.state.kitty_graphics_enabled);
-        assert_eq!(
-            report.diagnostics,
-            vec![
-                "terminal.kitty_graphics changes require restarting Herdr; kept current setting"
-                    .to_owned()
-            ]
-        );
 
         std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
@@ -2950,35 +2854,6 @@ mod tests {
     }
 
     #[test]
-    fn headless_next_loop_deadline_ignores_resize_poll() {
-        let mut app = test_app();
-        let now = Instant::now();
-        app.session_save_deadline = Some(now + Duration::from_secs(2));
-        app.next_auto_update_check = Some(now + Duration::from_secs(6));
-
-        assert_eq!(
-            app.next_headless_loop_deadline_with_git_refresh(now, false, true),
-            app.session_save_deadline
-        );
-    }
-
-    #[test]
-    fn headless_next_loop_deadline_returns_none_when_resize_poll_is_only_deadline() {
-        let mut app = test_app();
-        let now = Instant::now();
-        app.config_diagnostic_deadline = None;
-        app.toast_deadline = None;
-        app.next_auto_update_check = None;
-        app.session_save_deadline = None;
-        app.state.workspaces.clear();
-
-        assert_eq!(
-            app.next_headless_loop_deadline_with_git_refresh(now, false, true),
-            None
-        );
-    }
-
-    #[test]
     fn due_session_save_starts_background_writer() {
         let _guard = crate::config::test_config_env_lock().lock().unwrap();
         let config_home = unique_temp_path("background-session-save");
@@ -3256,7 +3131,7 @@ mod tests {
             AgentState::Working
         );
 
-        for i in 0..APP_EVENT_CHANNEL_CAPACITY {
+        for _ in 0..APP_EVENT_CHANNEL_CAPACITY {
             app.event_tx
                 .try_send(AppEvent::HookAuthorityCleared {
                     pane_id: crate::layout::PaneId::from_raw(u32::MAX),
@@ -3305,5 +3180,32 @@ mod tests {
             AgentState::Idle,
             "Working→Idle should still apply after temporary queue pressure"
         );
+    }
+
+    #[test]
+    fn reload_config_keeps_kitty_graphics_until_restart() {
+        let _guard = config_env_lock().lock().unwrap();
+        let path = temp_config_path("reload-config-kitty-graphics");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, "[terminal]\nkitty_graphics = false\n").unwrap();
+        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
+
+        let mut app = test_app();
+        assert!(app.state.kitty_graphics_enabled);
+
+        let report = app.reload_config();
+
+        assert_eq!(report.status, crate::config::ConfigReloadStatus::Partial);
+        assert!(app.state.kitty_graphics_enabled);
+        assert_eq!(
+            report.diagnostics,
+            vec![
+                "terminal.kitty_graphics changes require restarting Herdr; kept current setting"
+                    .to_owned()
+            ]
+        );
+
+        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 }

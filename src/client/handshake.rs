@@ -42,9 +42,6 @@ pub(super) fn client_shell_keybinding_source() -> shell::ClientShellKeybindingSo
 }
 
 pub(super) fn handshake_read_timeout() -> Duration {
-    if is_remote_client_process() {
-        return REMOTE_HANDSHAKE_READ_TIMEOUT;
-    }
     LOCAL_HANDSHAKE_READ_TIMEOUT
 }
 
@@ -121,33 +118,6 @@ pub(super) struct HandshakeResult {
     pub(super) encoding: RenderEncoding,
     pub(super) endpoint_methods: Option<Vec<String>>,
     pub(super) endpoint_capabilities: Option<Vec<String>>,
-}
-
-pub(crate) fn probe_endpoint_negotiation(
-    stream: &mut LocalStream,
-) -> io::Result<super::endpoint::EndpointNegotiation> {
-    let handshake = do_handshake(
-        stream,
-        80,
-        24,
-        0,
-        0,
-        HandshakePixelCapabilities {
-            exact_geometry: false,
-            sgr_mouse: false,
-        },
-        Some(crate::protocol::ClientSurfaceSize { cols: 80, rows: 24 }),
-        false,
-        false,
-        false,
-        false, // This probe uses an SSH bridge, not a shared filesystem.
-        &AtomicBool::new(false),
-    )
-    .map_err(io::Error::other)?;
-    Ok(super::endpoint::EndpointNegotiation::new(
-        handshake.endpoint_methods.unwrap_or_default(),
-        handshake.endpoint_capabilities.unwrap_or_default(),
-    ))
 }
 
 pub(super) struct HandshakePixelCapabilities {

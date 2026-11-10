@@ -249,14 +249,6 @@ impl Drop for EnvVarsRemovedGuard {
 }
 
 #[test]
-fn remote_client_uses_extended_handshake_timeout() {
-    let _guard = env_lock().lock().unwrap();
-    let _remote = EnvVarGuard::set(crate::remote::REMOTE_KEYBINDINGS_ENV_VAR, "local");
-
-    assert_eq!(handshake_read_timeout(), REMOTE_HANDSHAKE_READ_TIMEOUT);
-}
-
-#[test]
 fn host_cursor_policy_auto_uses_platform_default() {
     assert_eq!(
         should_draw_host_cursor(crate::config::HostCursorModeConfig::Auto),
@@ -654,91 +646,6 @@ fn client_error_display_server_shutdown_no_reason() {
 }
 
 #[test]
-fn client_error_display_detached_default_session_reattach_hint() {
-    let _guard = env_lock().lock().unwrap();
-    let _env = EnvVarsRemovedGuard::new(&[
-        crate::remote::REATTACH_COMMAND_ENV_VAR,
-        crate::session::SESSION_ENV_VAR,
-    ]);
-    let err = ClientError::ServerShutdown {
-        reason: Some("detached".into()),
-    };
-    let msg = err.to_string();
-    assert!(
-        msg.contains("Run `herdr` to reattach"),
-        "should suggest default reattach command: {msg}"
-    );
-}
-
-#[test]
-fn client_error_display_detached_named_session_reattach_hint() {
-    let _guard = env_lock().lock().unwrap();
-    let _remote_env = EnvVarsRemovedGuard::new(&[crate::remote::REATTACH_COMMAND_ENV_VAR]);
-    let _session_env = EnvVarGuard::set(crate::session::SESSION_ENV_VAR, "work");
-    let err = ClientError::ServerShutdown {
-        reason: Some("detached".into()),
-    };
-    let msg = err.to_string();
-    assert!(
-        msg.contains("Run `herdr session attach work` to reattach"),
-        "should suggest named session reattach command: {msg}"
-    );
-}
-
-#[test]
-fn client_error_display_detached_remote_reattach_hint_takes_precedence() {
-    let _guard = env_lock().lock().unwrap();
-    let _remote_env = EnvVarGuard::set(
-        crate::remote::REATTACH_COMMAND_ENV_VAR,
-        "herdr --remote host --session work",
-    );
-    let _session_env = EnvVarGuard::set(crate::session::SESSION_ENV_VAR, "work");
-    let err = ClientError::ServerShutdown {
-        reason: Some("detached".into()),
-    };
-    let msg = err.to_string();
-    assert!(
-        msg.contains("Run `herdr --remote host --session work` to reattach"),
-        "should prefer remote reattach command: {msg}"
-    );
-}
-
-#[test]
-fn client_error_display_connection_lost() {
-    let _guard = env_lock().lock().unwrap();
-    let _env = EnvVarsRemovedGuard::new(&[crate::remote::REATTACH_COMMAND_ENV_VAR]);
-    let err = ClientError::ConnectionLost(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"));
-    let msg = err.to_string();
-    assert!(
-        msg.contains("lost connection to server"),
-        "should mention lost connection: {msg}"
-    );
-}
-
-#[test]
-fn client_error_display_remote_connection_lost_has_reattach_hint() {
-    let _guard = env_lock().lock().unwrap();
-    let _remote_env = EnvVarGuard::set(
-        crate::remote::REATTACH_COMMAND_ENV_VAR,
-        "herdr --remote host --session work",
-    );
-    let err = ClientError::ConnectionLost(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"));
-    let msg = err.to_string();
-    assert!(
-        msg.contains("lost connection to remote Herdr"),
-        "should mention remote connection loss: {msg}"
-    );
-    assert!(
-        msg.contains("panes may still be running"),
-        "should explain possible persistence: {msg}"
-    );
-    assert!(
-        msg.contains("Run `herdr --remote host --session work` to reattach"),
-        "should show remote reattach command: {msg}"
-    );
-}
-
-#[test]
 fn sound_from_notify_message_maps_done() {
     assert_eq!(
         sound_from_notify_message("agent done"),
@@ -1043,4 +950,43 @@ fn terminal_control_scroll_command_maps_to_attach_scroll() {
     assert_eq!(source, AttachScrollSource::Wheel);
     assert_eq!(direction, AttachScrollDirection::Up);
     assert_eq!(lines, 3);
+}
+
+#[test]
+fn client_error_display_connection_lost() {
+    let _guard = env_lock().lock().unwrap();
+    let err = ClientError::ConnectionLost(io::Error::new(io::ErrorKind::BrokenPipe, "broken pipe"));
+    let msg = err.to_string();
+    assert!(
+        msg.contains("lost connection to server"),
+        "should mention lost connection: {msg}"
+    );
+}
+
+#[test]
+fn client_error_display_detached_named_session_reattach_hint() {
+    let _guard = env_lock().lock().unwrap();
+    let _session_env = EnvVarGuard::set(crate::session::SESSION_ENV_VAR, "work");
+    let err = ClientError::ServerShutdown {
+        reason: Some("detached".into()),
+    };
+    let msg = err.to_string();
+    assert!(
+        msg.contains("Run `herdr session attach work` to reattach"),
+        "should suggest named session reattach command: {msg}"
+    );
+}
+
+#[test]
+fn client_error_display_detached_default_session_reattach_hint() {
+    let _guard = env_lock().lock().unwrap();
+    let _env = EnvVarsRemovedGuard::new(&[crate::session::SESSION_ENV_VAR]);
+    let err = ClientError::ServerShutdown {
+        reason: Some("detached".into()),
+    };
+    let msg = err.to_string();
+    assert!(
+        msg.contains("Run `herdr` to reattach"),
+        "should suggest default reattach command: {msg}"
+    );
 }

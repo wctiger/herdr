@@ -293,7 +293,7 @@ fn server_stop_interrupts_server_event_backlog() {
 #[test]
 fn headless_api_request_drains_all_pending_internal_events_before_reading_state() {
     let mut server = test_headless_server();
-    for i in 0..=crate::app::APP_EVENT_DRAIN_LIMIT {
+    for _ in 0..=crate::app::APP_EVENT_DRAIN_LIMIT {
         server
             .app
             .event_tx
@@ -6252,16 +6252,6 @@ fn headless_scheduled_tasks_expire_agent_metadata() {
                     } if title.is_none()
                 )
         }));
-}
-
-#[test]
-fn headless_scheduled_tasks_clears_disabled_agent_manifest_update_deadline() {
-    let mut server = test_headless_server();
-    let now = Instant::now();
-    server.app.next_agent_manifest_update_check = Some(now - Duration::from_millis(1));
-
-    assert!(!server.handle_scheduled_tasks_headless(now, false));
-    assert_eq!(server.app.next_agent_manifest_update_check, None);
 }
 
 #[cfg(unix)]

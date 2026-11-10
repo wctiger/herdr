@@ -83,5 +83,4 @@ mod machine_tests {
             serde_json::json!({"workspace_id": "ws-2", "force": false})
         );
     }
-
 }

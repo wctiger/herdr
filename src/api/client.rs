@@ -78,13 +78,6 @@ impl ApiClient {
         self.read_status(None)
     }
 
-    pub(crate) fn status_with_timeout(
-        &self,
-        timeout: Duration,
-    ) -> Result<crate::api::RuntimeStatus, ApiClientError> {
-        self.read_status(Some(timeout))
-    }
-
     fn read_status(
         &self,
         timeout: Option<Duration>,
@@ -122,6 +115,14 @@ impl ApiClient {
 
     fn connect(&self) -> io::Result<LocalStream> {
         crate::ipc::connect_local_stream(&self.socket_path())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn status_with_timeout(
+        &self,
+        timeout: Duration,
+    ) -> Result<crate::api::RuntimeStatus, ApiClientError> {
+        self.read_status(Some(timeout))
     }
 }
 

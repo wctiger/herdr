@@ -7,19 +7,14 @@ use std::{
     sync::OnceLock,
 };
 
-pub(super) const REMOTE_BRIDGE_CLOCK: libc::clockid_t = libc::CLOCK_BOOTTIME;
-
 use super::{ClipboardCommand, ClipboardImage, ForegroundJob, ForegroundProcess, Signal};
 
 mod clipboard;
 
 pub(crate) use super::unix_common::{
-    configure_status_command, create_remote_private_dir, create_remote_ssh_config_dir,
-    create_remote_ssh_config_file, hostname, local_datetime, remote_bridge_endpoint_path,
-    remote_private_temp_base, remote_reattach_argument, remote_reattach_program,
-    remote_ssh_config_paths, set_default_plugin_pane_pwd, shutdown_client_stream,
-    status_commands_supported, wait_client_stream_readable, write_client_stream,
-    ClientStreamReader, PinnedSshControlSocket, StatusCommandGuard,
+    configure_status_command, hostname, local_datetime, set_default_plugin_pane_pwd,
+    shutdown_client_stream, status_commands_supported, wait_client_stream_readable,
+    write_client_stream, ClientStreamReader, StatusCommandGuard,
 };
 
 #[cfg(test)]

@@ -155,7 +155,7 @@ fn release_notes_preview_line_entries<'a>(
     let instruction = if install_command.is_empty() {
         "Install the new version manually, then restart.".to_string()
     } else {
-        format!("Run `{install_command}` to install.")
+        format!("detach, run `{install_command}`, then run Herdr again to reconnect")
     };
     let (instruction_width, mut instruction_spans) =
         release_notes_inline_spans(&instruction, text_style, inline_code_style);

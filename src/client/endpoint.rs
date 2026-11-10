@@ -1,7 +1,6 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest as _, Sha256};
 
 mod activation;
 mod catalog;
@@ -39,6 +38,7 @@ impl ProfileId {
         Ok(Self(value))
     }
 
+    #[cfg(test)]
     pub(crate) fn generate() -> Self {
         use std::sync::atomic::{AtomicU64, Ordering};
         static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -48,7 +48,9 @@ impl ProfileId {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_nanos();
-        let digest = Sha256::digest(format!("{}:{now}:{sequence}", std::process::id()).as_bytes());
+        let digest = <sha2::Sha256 as sha2::Digest>::digest(
+            format!("{}:{now}:{sequence}", std::process::id()).as_bytes(),
+        );
         Self(
             digest[..PROFILE_ID_BYTES]
                 .iter()
@@ -57,6 +59,7 @@ impl ProfileId {
         )
     }
 
+    #[cfg(test)]
     pub(crate) fn as_str(&self) -> &str {
         &self.0
     }

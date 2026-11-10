@@ -49,7 +49,6 @@ pub struct DetectionExplain {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ManifestSource {
     Bundled,
-    Remote { path: PathBuf, version: String },
     Override(PathBuf),
 }
 
@@ -57,7 +56,6 @@ impl ManifestSource {
     pub fn label(&self) -> String {
         match self {
             Self::Bundled => "bundled".to_string(),
-            Self::Remote { path, .. } => format!("remote:{}", path.display()),
             Self::Override(path) => path.display().to_string(),
         }
     }
@@ -65,7 +63,6 @@ impl ManifestSource {
     pub fn kind(&self) -> &'static str {
         match self {
             Self::Bundled => "bundled",
-            Self::Remote { .. } => "remote",
             Self::Override(_) => "local override",
         }
     }
@@ -285,36 +282,6 @@ pub(crate) fn reload_manifests() -> Vec<AgentManifestSummary> {
         Err(poisoned) => *poisoned.into_inner() = cache,
     }
     summaries
-}
-
-pub(crate) fn reload_manifests_for_agents(agents: &[Agent]) {
-    if agents.is_empty() {
-        return;
-    }
-
-    let _reload_guard = MANIFEST_RELOAD_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let lock = manifest_cache();
-    let replacements = Agent::SCREEN_MANIFEST_AGENTS
-        .into_iter()
-        .filter(|agent| agents.contains(agent))
-        .map(|agent| (agent, load_manifest_uncached(agent)))
-        .collect::<Vec<_>>();
-    let mut cache = match lock.write() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-    for (agent, replacement) in replacements {
-        if let Some((_, loaded)) = cache
-            .manifests
-            .iter_mut()
-            .find(|(cached_agent, _)| *cached_agent == agent)
-        {
-            *loaded = replacement;
-        }
-    }
 }
 
 fn manifest_cache() -> &'static RwLock<ManifestCache> {
@@ -586,102 +553,61 @@ fn load_manifest(agent: Agent) -> Option<LoadedManifest> {
         .and_then(|(_, loaded)| loaded.clone())
 }
 
+/// Manifests come from the bundled catalog or a local override only; this
+/// offline build never downloads or reads remotely published manifests.
 fn load_manifest_uncached(agent: Agent) -> Option<LoadedManifest> {
     let bundled = bundled_manifest(agent)?;
-    let mut remote = read_remote_manifest(agent, &bundled);
-    let cached_remote_version = remote.as_ref().and_then(|loaded| match &loaded.source {
-        _ if loaded.cached_remote_version.is_some() => loaded.cached_remote_version.clone(),
-        ManifestSource::Remote { version, .. } => Some(version.clone()),
-        _ => None,
-    });
     let Some(path) = override_path(agent) else {
-        if let Some(loaded) = remote.as_mut() {
-            loaded.cached_remote_version = cached_remote_version.clone();
-        }
-        return Some(remote.unwrap_or_else(|| {
-            bundled_loaded_manifest(agent, bundled, None, cached_remote_version, false)
-        }));
+        return Some(bundled_loaded_manifest(agent, bundled, None, None, false));
     };
-    let local_override_shadowing_remote = path.exists() && cached_remote_version.is_some();
-    if let Some(loaded) = remote.as_mut() {
-        loaded.cached_remote_version = cached_remote_version.clone();
-        loaded.local_override_shadowing_remote = local_override_shadowing_remote;
-    }
-
     if !path.exists() {
-        return Some(remote.unwrap_or_else(|| {
-            bundled_loaded_manifest(
-                agent,
-                bundled,
-                None,
-                cached_remote_version,
-                local_override_shadowing_remote,
-            )
-        }));
+        return Some(bundled_loaded_manifest(agent, bundled, None, None, false));
     }
 
+    let fallback = |bundled: AgentManifest, warning: String| {
+        Some(bundled_loaded_manifest(
+            agent,
+            bundled,
+            Some(warning),
+            None,
+            false,
+        ))
+    };
     match read_override_manifest(&path) {
         Ok(manifest) if manifest_matches_agent(&manifest, agent) => {
             match loaded_manifest(
                 manifest,
                 ManifestSource::Override(path.clone()),
                 None,
-                cached_remote_version.clone(),
-                local_override_shadowing_remote,
+                None,
+                false,
             ) {
                 Ok(loaded) => Some(loaded),
-                Err(err) => {
-                    let mut loaded = remote.unwrap_or_else(|| {
-                        bundled_loaded_manifest(
-                            agent,
-                            bundled,
-                            None,
-                            cached_remote_version,
-                            local_override_shadowing_remote,
-                        )
-                    });
-                    loaded.warning = Some(format!(
+                Err(err) => fallback(
+                    bundled,
+                    format!(
                         "ignored override {} because it could not be compiled: {err}",
                         path.display()
-                    ));
-                    Some(loaded)
-                }
+                    ),
+                ),
             }
         }
-        Ok(manifest) => {
-            let mut loaded = remote.unwrap_or_else(|| {
-                bundled_loaded_manifest(
-                    agent,
-                    bundled,
-                    None,
-                    cached_remote_version,
-                    local_override_shadowing_remote,
-                )
-            });
-            loaded.warning = Some(format!(
+        Ok(manifest) => fallback(
+            bundled,
+            format!(
                 "ignored override {} because manifest id {} does not match {}",
                 path.display(),
                 manifest.id,
                 agent_label(agent)
-            ));
-            Some(loaded)
-        }
-        Err(err) => {
-            let mut loaded = remote.unwrap_or_else(|| {
-                bundled_loaded_manifest(
-                    agent,
-                    bundled,
-                    None,
-                    cached_remote_version,
-                    local_override_shadowing_remote,
-                )
-            });
-            loaded.warning = Some(format!(
+            ),
+        ),
+        Err(err) => fallback(
+            bundled,
+            format!(
                 "ignored override {} because it could not be loaded: {err}",
                 path.display()
-            ));
-            Some(loaded)
-        }
+            ),
+        ),
     }
 }
 
@@ -739,74 +665,6 @@ fn bundled_manifest(agent: Agent) -> Option<AgentManifest> {
 fn read_override_manifest(path: &Path) -> Result<AgentManifest, String> {
     let content = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
     parse_manifest(&content)
-}
-
-fn read_remote_manifest(agent: Agent, bundled: &AgentManifest) -> Option<LoadedManifest> {
-    let path = super::manifest_update::remote_manifest_path(agent);
-    if !path.exists() {
-        return None;
-    }
-    match std::fs::read_to_string(&path)
-        .map_err(|err| err.to_string())
-        .and_then(|content| {
-            parse_remote_manifest_for_agent(agent, &content).map(|parsed| parsed.manifest)
-        }) {
-        Ok(manifest) => {
-            let version = manifest
-                .version
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_else(|| "unknown".to_string());
-            if let (Some(remote_version), Some(bundled_version)) =
-                (manifest.version.as_ref(), bundled.version.as_ref())
-            {
-                if remote_version < bundled_version {
-                    return Some(bundled_loaded_manifest(
-                        agent,
-                        bundled.clone(),
-                        Some(format!(
-                            "ignored remote manifest {} because cached version {remote_version} is older than bundled {bundled_version}",
-                            path.display()
-                        )),
-                        Some(remote_version.to_string()),
-                        false,
-                    ));
-                }
-            }
-            match loaded_manifest(
-                manifest,
-                ManifestSource::Remote {
-                    path: path.clone(),
-                    version,
-                },
-                None,
-                None,
-                false,
-            ) {
-                Ok(loaded) => Some(loaded),
-                Err(err) => Some(bundled_loaded_manifest(
-                    agent,
-                    bundled.clone(),
-                    Some(format!(
-                        "ignored remote manifest {} because it could not be compiled: {err}",
-                        path.display()
-                    )),
-                    None,
-                    false,
-                )),
-            }
-        }
-        Err(err) => Some(bundled_loaded_manifest(
-            agent,
-            bundled.clone(),
-            Some(format!(
-                "ignored remote manifest {} because it could not be loaded: {err}",
-                path.display()
-            )),
-            None,
-            false,
-        )),
-    }
 }
 
 pub fn agent_state_label(state: AgentState) -> &'static str {
@@ -873,43 +731,10 @@ pub fn explain_to_json_value(explain: &DetectionExplain) -> serde_json::Value {
     })
 }
 
-pub(crate) struct ParsedRemoteManifest {
-    pub(crate) manifest: AgentManifest,
-    pub(crate) version: ManifestVersion,
-}
-
 pub(crate) fn parse_manifest(content: &str) -> Result<AgentManifest, String> {
     let manifest = toml::from_str::<AgentManifest>(content).map_err(|err| err.to_string())?;
     validate_manifest(&manifest)?;
     Ok(manifest)
-}
-
-pub(crate) fn parse_remote_manifest_for_agent(
-    agent: Agent,
-    content: &str,
-) -> Result<ParsedRemoteManifest, String> {
-    let manifest = parse_manifest(content)?;
-    if !manifest_matches_agent(&manifest, agent) {
-        return Err(format!(
-            "manifest id {} does not match {}",
-            manifest.id,
-            agent_label(agent)
-        ));
-    }
-    let version = manifest
-        .version
-        .clone()
-        .ok_or("remote manifest must include version")?;
-    let min_engine_version = manifest
-        .min_engine_version
-        .ok_or("remote manifest must include min_engine_version")?;
-    if min_engine_version > super::manifest_update::MANIFEST_ENGINE_VERSION {
-        return Err(format!(
-            "manifest requires engine {min_engine_version}, current engine is {}",
-            super::manifest_update::MANIFEST_ENGINE_VERSION
-        ));
-    }
-    Ok(ParsedRemoteManifest { manifest, version })
 }
 
 fn validate_manifest(manifest: &AgentManifest) -> Result<(), String> {
@@ -1125,7 +950,7 @@ fn override_path(agent: Agent) -> Option<PathBuf> {
 }
 
 fn remote_update_status(agent: Agent) -> Option<super::manifest_update::AgentRemoteStatus> {
-    super::manifest_update::load_status().agent_status(agent)
+    super::manifest_update::ManifestUpdateStatus::default().agent_status(agent)
 }
 
 fn manifest_matches_agent(manifest: &AgentManifest, agent: Agent) -> bool {

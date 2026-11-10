@@ -812,7 +812,6 @@ pub struct AppState {
     pub update_available: Option<String>,
     pub update_install_command: String,
     pub latest_release_notes_available: bool,
-    pub update_dismissed: bool,
     pub config_diagnostic: Option<String>,
     pub toast: Option<ToastNotification>,
     pub pending_agent_notifications: std::collections::HashMap<PaneId, PendingAgentNotification>,
@@ -867,8 +866,6 @@ pub struct AppState {
     /// Cached integration recommendations and detection manifest summaries.
     pub integration_recommendations: Vec<crate::integration::IntegrationRecommendation>,
     pub agent_manifest_summaries: Vec<crate::detect::manifest::AgentManifestSummary>,
-    /// Cached remote detection manifest update diagnostics for runtime/API status.
-    pub agent_manifest_update_status: crate::detect::manifest_update::ManifestUpdateStatus,
     /// Installed or linked plugins known to this running Herdr instance.
     pub(crate) installed_plugins: InstalledPluginRegistry,
     /// Pane ids opened through the plugin pane API.
@@ -1054,9 +1051,8 @@ impl AppState {
                 pane_infos: Vec::new(),
             },
             update_available: None,
-            update_install_command: "herdr update".into(),
+            update_install_command: String::new(),
             latest_release_notes_available: false,
-            update_dismissed: false,
             config_diagnostic: None,
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
@@ -1108,8 +1104,6 @@ impl AppState {
             host_terminal_appearance_explicit: false,
             integration_recommendations: Vec::new(),
             agent_manifest_summaries: Vec::new(),
-            agent_manifest_update_status:
-                crate::detect::manifest_update::ManifestUpdateStatus::default(),
             installed_plugins: std::collections::HashMap::new(),
             plugin_panes: std::collections::HashMap::new(),
             popup_pane: None,

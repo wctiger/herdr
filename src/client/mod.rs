@@ -126,14 +126,11 @@ use frame_output::{
     contains_kitty_graphics_bytes, record_received_kitty_graphics,
     write_encoded_frame_with_graphics,
 };
-pub(crate) use handshake::probe_endpoint_negotiation;
+#[cfg(test)]
+use handshake::direct_graphics_profile_values;
 use handshake::{
     client_shell_keybinding_source, do_handshake, is_remote_client_process,
     HandshakePixelCapabilities,
-};
-#[cfg(test)]
-use handshake::{
-    direct_graphics_profile_values, handshake_read_timeout, REMOTE_HANDSHAKE_READ_TIMEOUT,
 };
 use notifications::{handle_notify, handle_shell_notification_effects};
 #[cfg(test)]

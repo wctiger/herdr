@@ -275,39 +275,12 @@ fn group(name: &'static str, about: &'static str, leaves: &[Leaf]) -> Command {
 
 pub(crate) fn command() -> Command {
     Command::new("plugin")
-        .about("Install and run workflow plugins")
+        .about("Link and run local workflow plugins")
         .subcommand_required(true)
-        .subcommand(
-            Command::new("install")
-                .about("Install a plugin from GitHub")
-                .arg(
-                    Arg::new("source")
-                        .value_name("OWNER/REPO[/SUBDIR]")
-                        .required(true),
-                )
-                .arg(Arg::new("ref").long("ref").value_name("REF"))
-                .arg(
-                    Arg::new("yes")
-                        .short('y')
-                        .long("yes")
-                        .action(ArgAction::SetTrue),
-                ),
-        )
         .subcommand(
             Command::new("uninstall")
                 .about("Uninstall a plugin")
                 .arg(Arg::new("plugin").value_name("PLUGIN").required(true)),
-        )
-        .subcommand(
-            Command::new("update")
-                .about("Update GitHub-installed plugins")
-                .arg(Arg::new("plugins").value_name("PLUGIN").num_args(0..))
-                .arg(
-                    Arg::new("yes")
-                        .short('y')
-                        .long("yes")
-                        .action(ArgAction::SetTrue),
-                ),
         )
         .subcommands(DIRECT.iter().map(Leaf::command))
         .subcommand(

@@ -30,26 +30,6 @@ pub fn pending_path() -> PathBuf {
     path
 }
 
-pub fn save_pending(version: &str, body: &str) -> std::io::Result<()> {
-    save_pending_to_path(&pending_path(), version, body)
-}
-
-fn save_pending_to_path(path: &Path, version: &str, body: &str) -> std::io::Result<()> {
-    let body = normalize_body(body);
-    if body.is_empty() {
-        return clear_pending_at(path);
-    }
-
-    write_stored_to_path(
-        path,
-        &StoredReleaseNotes {
-            version: version.to_string(),
-            body,
-            show_on_startup: true,
-        },
-    )
-}
-
 fn write_stored_to_path(path: &Path, stored: &StoredReleaseNotes) -> std::io::Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -118,6 +98,38 @@ fn mark_current_version_seen_at(path: &Path, current_version: &str) -> std::io::
     write_stored_to_path(path, &stored)
 }
 
+pub fn normalize_body(body: &str) -> String {
+    body.lines()
+        .map(str::trim_end)
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
+}
+
+#[cfg(test)]
+pub fn save_pending(version: &str, body: &str) -> std::io::Result<()> {
+    save_pending_to_path(&pending_path(), version, body)
+}
+
+#[cfg(test)]
+fn save_pending_to_path(path: &Path, version: &str, body: &str) -> std::io::Result<()> {
+    let body = normalize_body(body);
+    if body.is_empty() {
+        return clear_pending_at(path);
+    }
+
+    write_stored_to_path(
+        path,
+        &StoredReleaseNotes {
+            version: version.to_string(),
+            body,
+            show_on_startup: true,
+        },
+    )
+}
+
+#[cfg(test)]
 fn clear_pending_at(path: &Path) -> std::io::Result<()> {
     if path.exists() {
         fs::remove_file(path)
@@ -126,17 +138,7 @@ fn clear_pending_at(path: &Path) -> std::io::Result<()> {
     }
 }
 
-pub fn load_preview_from_local_changelog(version: &str) -> Option<ReleaseNotes> {
-    let path = Path::new("CHANGELOG.md");
-    let content = fs::read_to_string(path).ok()?;
-    let body = extract_version_section(&content, version)?;
-    Some(ReleaseNotes {
-        version: version.to_string(),
-        body: normalize_body(&body),
-        preview: true,
-    })
-}
-
+#[cfg(test)]
 fn extract_version_section(content: &str, version: &str) -> Option<String> {
     let header = format!("## [{version}]");
     let mut collecting = false;
@@ -159,15 +161,6 @@ fn extract_version_section(content: &str, version: &str) -> Option<String> {
 
     let body = lines.join("\n").trim().to_string();
     (!body.is_empty()).then_some(body)
-}
-
-pub fn normalize_body(body: &str) -> String {
-    body.lines()
-        .map(str::trim_end)
-        .collect::<Vec<_>>()
-        .join("\n")
-        .trim()
-        .to_string()
 }
 
 #[cfg(test)]

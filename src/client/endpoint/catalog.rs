@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use super::ProfileId;
 
 const CATALOG_VERSION: u32 = 1;
-pub(crate) const MAX_LABEL_BYTES: usize = 128;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

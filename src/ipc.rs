@@ -9,7 +9,7 @@ use interprocess::local_socket::traits::Stream as _;
 
 pub(crate) type LocalListener = interprocess::local_socket::Listener;
 pub(crate) type LocalStream = interprocess::local_socket::Stream;
-#[cfg(unix)]
+#[cfg(all(unix, test))]
 type PrivateLocalListener = LocalListener;
 #[cfg(windows)]
 type PrivateLocalListener = crate::platform::PrivateLocalListener;
@@ -175,22 +175,6 @@ pub(crate) fn set_local_stream_polling(stream: &mut LocalStream, enabled: bool) 
     {
         let _ = (stream, enabled);
         Ok(())
-    }
-}
-
-/// Binds a listener for private terminal traffic. Unix callers restrict the
-/// socket file after binding; Windows must set the named-pipe DACL at creation.
-pub(crate) fn bind_private_local_listener(path: &Path) -> io::Result<PrivateLocalListener> {
-    #[cfg(unix)]
-    {
-        bind_local_listener(path)
-    }
-
-    #[cfg(windows)]
-    {
-        let listener = PrivateLocalListener::bind(path)?;
-        fs::write(path, windows_socket_marker())?;
-        Ok(listener)
     }
 }
 
@@ -368,6 +352,23 @@ pub(crate) fn restrict_socket_permissions(path: &Path, mode: u32) -> io::Result<
 #[cfg(windows)]
 pub(crate) fn restrict_socket_permissions(_path: &Path, _mode: u32) -> io::Result<()> {
     Ok(())
+}
+
+#[cfg(test)]
+/// Binds a listener for private terminal traffic. Unix callers restrict the
+/// socket file after binding; Windows must set the named-pipe DACL at creation.
+pub(crate) fn bind_private_local_listener(path: &Path) -> io::Result<PrivateLocalListener> {
+    #[cfg(unix)]
+    {
+        bind_local_listener(path)
+    }
+
+    #[cfg(windows)]
+    {
+        let listener = PrivateLocalListener::bind(path)?;
+        fs::write(path, windows_socket_marker())?;
+        Ok(listener)
+    }
 }
 
 #[cfg(test)]

@@ -20,21 +20,6 @@ pub(super) fn unique_test_dir() -> PathBuf {
     PathBuf::from(format!("/tmp/hcli-{}-{nanos}", std::process::id()))
 }
 
-pub(super) fn managed_github_plugin_dir(config_home: &Path) -> PathBuf {
-    config_home
-        .join("herdr-dev")
-        .join("plugins")
-        .join("github-installations")
-}
-
-pub(super) fn path_missing_or_empty(path: &Path) -> bool {
-    match fs::read_dir(path) {
-        Ok(mut entries) => entries.next().is_none(),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => true,
-        Err(err) => panic!("failed to read {}: {err}", path.display()),
-    }
-}
-
 pub(super) fn run_git(repo: &Path, args: &[&str]) {
     let status = Command::new("git")
         .arg("-C")

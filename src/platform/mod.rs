@@ -222,9 +222,7 @@ impl ChildExitReason {
 }
 
 #[cfg(unix)]
-pub(crate) use unix_common::{
-    classify_child_exit, poll_fd_readable, read_fd, shared_ssh_control_path,
-};
+pub(crate) use unix_common::{classify_child_exit, poll_fd_readable, read_fd};
 
 // Tests inject their own probe because the recorded hangup is process-global.
 #[cfg_attr(test, allow(dead_code))]
@@ -525,20 +523,6 @@ pub(crate) fn read_limited_reader(
     }
 }
 
-#[derive(Debug, Clone)]
-pub(crate) struct RemoteSshConfigPaths {
-    pub(crate) user_config: Option<std::path::PathBuf>,
-    pub(crate) system_config: Option<std::path::PathBuf>,
-    pub(crate) multiplexing: bool,
-}
-
-pub(crate) const REMOTE_BRIDGE_IDLE_TIMEOUT_SUPPORTED: bool =
-    cfg!(any(target_os = "linux", target_os = "macos"));
-
-#[cfg(unix)]
-mod remote_bridge;
-#[cfg(all(test, unix))]
-mod remote_bridge_tests;
 #[cfg(unix)]
 mod unix_common;
 /// Other Unix platforms keep their existing input admission policy.
@@ -561,12 +545,12 @@ impl PtyInputGuard {
 pub(crate) mod unix_image_files;
 #[cfg(unix)]
 pub(crate) use unix_common::{
-    begin_cli_output, end_cli_output, forward_remote_bridge_stdio, ignore_server_hangup,
-    local_stream_peer_description, spawn_server_signal_monitor, ChildPipe, RemoteBridgeWake,
+    begin_cli_output, ignore_server_hangup, local_stream_peer_description,
+    spawn_server_signal_monitor,
 };
 
 mod client_state;
-pub(crate) use client_state::{create_private_state_file, replace_file, sync_parent_directory};
+pub(crate) use client_state::{replace_file, sync_parent_directory};
 
 #[cfg(not(unix))]
 pub(crate) fn begin_cli_output() {}
@@ -661,6 +645,7 @@ pub(crate) fn quote_powershell_arg(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }
 
+#[cfg(windows)]
 pub(crate) fn quote_windows_command_line_arg(value: &str) -> String {
     if !value.is_empty()
         && !value

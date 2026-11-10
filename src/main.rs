@@ -16,7 +16,6 @@ mod agent_view_eval;
 mod api;
 mod app;
 mod build_info;
-mod checksum;
 mod cli;
 mod client;
 mod config;

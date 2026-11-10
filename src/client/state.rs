@@ -501,13 +501,6 @@ impl ClientState {
         }
     }
 
-    #[cfg(unix)]
-    pub(super) fn forget_endpoint_graphics(&mut self, endpoint_id: &endpoint::ClientEndpointId) {
-        self.retire_pending_endpoint_graphics(endpoint_id, None);
-        self.disabled_native_graphics.remove(endpoint_id);
-        self.retired_direct_graphics.remove(endpoint_id);
-    }
-
     pub(super) fn present_frame(&mut self, frame_data: impl Into<frame_output::ComposedFrame>) {
         let _ = self.try_present_frame(frame_data);
     }

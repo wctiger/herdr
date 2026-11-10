@@ -168,11 +168,6 @@ fn server_command() -> Command {
                 .arg(json_flag()),
         )
         .subcommand(
-            Command::new("update-agent-manifests")
-                .about("Fetch and reload agent detection manifests")
-                .arg(json_flag()),
-        )
-        .subcommand(
             Command::new("reload-agent-manifests")
                 .about("Reload local agent detection manifest overrides"),
         );
