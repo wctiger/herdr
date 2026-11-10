@@ -183,9 +183,9 @@ impl ClientShellState {
         };
         let code = machine_diagnostic_code(profile_id);
         let command = if ssh_error_requires_authentication(error) {
-            format!("herdr machine reconnect {profile_id}")
+            format!("sy-term machine reconnect {profile_id}")
         } else {
-            format!("herdr machine status {profile_id}")
+            format!("sy-term machine status {profile_id}")
         };
         // A requested retry can report its diagnostic, but must not replace another notice.
         if self

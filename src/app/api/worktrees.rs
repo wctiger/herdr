@@ -191,7 +191,7 @@ impl App {
             let space = crate::workspace::git_space_metadata(&path).ok_or_else(|| {
                 ApiFailure::new(
                     "not_git_worktree",
-                    "Herdr worktree actions require a path inside a Git work tree",
+                    "sy-term worktree actions require a path inside a Git work tree",
                 )
             })?;
             if space.is_linked_worktree {
@@ -256,7 +256,7 @@ impl App {
         let Some(space) = git_space else {
             return Err(ApiFailure::new(
                 "not_git_worktree",
-                "Herdr worktree actions require a workspace inside a Git work tree",
+                "sy-term worktree actions require a workspace inside a Git work tree",
             ));
         };
         if space.is_linked_worktree {
@@ -603,7 +603,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        std::env::temp_dir().join(format!("herdr-{name}-{}-{nanos}", std::process::id()))
+        std::env::temp_dir().join(format!("sy-term-{name}-{}-{nanos}", std::process::id()))
     }
 
     fn run_git(repo: &Path, args: &[&str]) {
@@ -625,8 +625,8 @@ mod tests {
         let repo = unique_temp_path(name);
         std::fs::create_dir_all(&repo).unwrap();
         run_git(&repo, &["init", "--quiet"]);
-        run_git(&repo, &["config", "user.email", "herdr@example.invalid"]);
-        run_git(&repo, &["config", "user.name", "Herdr Test"]);
+        run_git(&repo, &["config", "user.email", "sy-term@example.invalid"]);
+        run_git(&repo, &["config", "user.name", "sy-term Test"]);
         std::fs::write(repo.join("README.md"), "test\n").unwrap();
         run_git(&repo, &["add", "README.md"]);
         run_git(&repo, &["commit", "--quiet", "-m", "initial"]);
@@ -1147,7 +1147,7 @@ mod tests {
                 source_checkout_path: repo.clone(),
                 source_repo_root: repo.clone(),
                 repo_key: "repo-key".into(),
-                repo_name: "herdr".into(),
+                repo_name: "sy-term".into(),
                 label: None,
                 focus: false,
                 respond_to,
@@ -2633,18 +2633,18 @@ mod tests {
     #[test]
     fn deferred_api_background_worktree_remove_preserves_focused_workspace() {
         let mut app = test_app();
-        let checkout = PathBuf::from("/repo/herdr-issue");
+        let checkout = PathBuf::from("/repo/sy-term-issue");
         let membership = crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
             checkout_path: checkout.clone(),
             is_linked_worktree: true,
         };
         let mut parent = Workspace::test_new("parent");
         parent.worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             is_linked_worktree: false,
-            checkout_path: "/repo/herdr".into(),
+            checkout_path: "/repo/sy-term".into(),
             ..membership.clone()
         });
         let mut child = Workspace::test_new("child");
@@ -2705,12 +2705,12 @@ mod tests {
     async fn deferred_api_worktree_remove_emits_removed_after_workspace_changes() {
         let event_hub = crate::api::EventHub::default();
         let mut app = test_app_with_event_hub(event_hub.clone());
-        let checkout = PathBuf::from("/repo/herdr-issue");
+        let checkout = PathBuf::from("/repo/sy-term-issue");
         let mut child = Workspace::test_new("child");
         child.worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
             checkout_path: checkout.clone(),
             is_linked_worktree: true,
         });
@@ -2730,8 +2730,8 @@ mod tests {
             .insert(child_pane_id, 1);
         app.state.workspaces[0].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
             checkout_path: "/repo/other".into(),
             is_linked_worktree: true,
         });

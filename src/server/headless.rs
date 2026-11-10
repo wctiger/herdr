@@ -268,7 +268,7 @@ fn spawn_windows_client_accept_thread(
     should_quit: Arc<AtomicBool>,
     server_event_tx: mpsc::Sender<ServerEvent>,
 ) -> io::Result<std::thread::JoinHandle<()>> {
-    crate::thread_spawn::spawn_named("herdr-client-accept", move || {
+    crate::thread_spawn::spawn_named("sy-term-client-accept", move || {
         let mut next_client_id = 1_u64;
         while !should_quit.load(Ordering::Acquire) {
             let stream = match listener.accept() {
@@ -293,7 +293,7 @@ fn spawn_windows_client_accept_thread(
 
             let should_quit = should_quit.clone();
             let server_event_tx = server_event_tx.clone();
-            let spawned = crate::thread_spawn::spawn_named("herdr-client-conn", move || {
+            let spawned = crate::thread_spawn::spawn_named("sy-term-client-conn", move || {
                 if let Err(err) = crate::server::client_transport::handle_client_handshake(
                     stream,
                     client_id,
@@ -2109,7 +2109,8 @@ impl HeadlessServer {
                 size,
                 max,
             } => {
-                let detail = format!("Input message is {size} bytes; Herdr's limit is {max} bytes");
+                let detail =
+                    format!("Input message is {size} bytes; sy-term's limit is {max} bytes");
                 let message = if matches!(
                     self.clients.get(&client_id).map(|client| &client.mode),
                     Some(ClientConnectionMode::ClientShell)

@@ -174,7 +174,7 @@ fn plugin_link_list_unlink_cli_smoke_test() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
     let plugin_dir = base.join("plugins").join("layout");
     fs::create_dir_all(&plugin_dir).unwrap();
     fs::write(
@@ -184,7 +184,7 @@ id = "example.layout"
 name = "Layout"
 version = "0.1.0"
 min_herdr_version = "0.6.10"
-description = "Apply a preferred Herdr layout"
+description = "Apply a preferred sy-term layout"
 
 [[actions]]
 id = "apply"

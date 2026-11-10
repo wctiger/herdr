@@ -357,7 +357,7 @@ pub(super) fn read_capped_plugin_output(mut reader: impl Read, cap: usize) -> St
     let mut output = String::from_utf8_lossy(&kept).into_owned();
     if truncated {
         output.push_str(&format!(
-            "\n[herdr truncated plugin output after {cap} bytes]"
+            "\n[sy-term truncated plugin output after {cap} bytes]"
         ));
     }
     output

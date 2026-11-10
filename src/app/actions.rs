@@ -2096,8 +2096,8 @@ mod tests {
     fn mark_linked_worktree(state: &mut AppState, ws_idx: usize) {
         state.workspaces[ws_idx].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
             checkout_path: format!("/repo/worktree-{ws_idx}").into(),
             is_linked_worktree: true,
         });
@@ -2106,9 +2106,9 @@ mod tests {
     fn mark_parent_worktree(state: &mut AppState, ws_idx: usize) {
         state.workspaces[ws_idx].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
+            checkout_path: "/repo/sy-term".into(),
             is_linked_worktree: false,
         });
     }
@@ -2207,9 +2207,9 @@ mod tests {
                 "./src/app/actions.rs:795",
             ),
             (
-                "open ../herdr-worktrees/issue-1",
-                "herdr",
-                "../herdr-worktrees/issue-1",
+                "open ../sy-term-worktrees/issue-1",
+                "sy-term",
+                "../sy-term-worktrees/issue-1",
             ),
             (
                 "edit src/app/actions.rs,then",
@@ -2245,7 +2245,11 @@ mod tests {
             ),
             ("refs #123 and @owner/name", "#123", "#123"),
             ("refs #123 and @owner/name", "owner", "@owner/name"),
-            ("cargo test --package=herdr", "--package", "--package=herdr"),
+            (
+                "cargo test --package=sy-term",
+                "--package",
+                "--package=sy-term",
+            ),
             (
                 "cargo test app::actions::tests",
                 "app::",
@@ -2258,7 +2262,7 @@ mod tests {
             ),
             ("ERROR [worker-1] request_id=abc-123", "worker", "worker-1"),
             (
-                "tmux|newhoo|fixhoo|newmoo|notification|window_bell|herdr",
+                "tmux|newhoo|fixhoo|newmoo|notification|window_bell|sy-term",
                 "newhoo",
                 "newhoo",
             ),
@@ -2305,7 +2309,7 @@ mod tests {
     fn double_click_word_bounds_ignore_delimiters() {
         for (row, click) in [
             (
-                "tmux|newhoo|fixhoo|newmoo|notification|window_bell|herdr",
+                "tmux|newhoo|fixhoo|newmoo|notification|window_bell|sy-term",
                 "|",
             ),
             ("alpha,beta;gamma", ","),
@@ -2834,16 +2838,16 @@ mod tests {
         let mut state = app_with_workspaces(&["main", "issue", "notes"]);
         state.workspaces[0].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
+            checkout_path: "/repo/sy-term".into(),
             is_linked_worktree: false,
         });
         state.workspaces[1].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr-issue".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
+            checkout_path: "/repo/sy-term-issue".into(),
             is_linked_worktree: true,
         });
         state.selected = 0;
@@ -4080,7 +4084,7 @@ mod tests {
             .attached_terminal_id
             .clone();
         let cwd =
-            std::env::temp_dir().join(format!("herdr-cwd-report-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("sy-term-cwd-report-test-{}", std::process::id()));
         std::fs::create_dir_all(&cwd).unwrap();
         state.session_dirty = false;
 

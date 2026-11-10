@@ -62,16 +62,19 @@ fn server_restores_while_git_metadata_is_blocked() {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let base = PathBuf::from(format!("/tmp/herdr-restore-{}-{nonce}", std::process::id()));
+        let base = PathBuf::from(format!(
+            "/tmp/sy-term-restore-{}-{nonce}",
+            std::process::id()
+        ));
         fs::create_dir_all(&base).unwrap();
         let base = fs::canonicalize(base).unwrap();
         let config_home = base.join("config");
         let runtime_dir = base.join("runtime");
-        let socket_path = runtime_dir.join("herdr.sock");
+        let socket_path = runtime_dir.join("sy-term.sock");
         let data_dir = config_home.join(if cfg!(debug_assertions) {
-            "herdr-dev"
+            "sy-term-dev"
         } else {
-            "herdr"
+            "sy-term"
         });
         let repo = base.join("repo");
         fs::create_dir_all(repo.join(".git/objects")).unwrap();
@@ -127,7 +130,7 @@ fn server_restores_while_git_metadata_is_blocked() {
         fs::write(data_dir.join("config.toml"),
             "onboarding = false\n[terminal]\ndefault_shell = \"/bin/sh\"\n[ui.sidebar.spaces]\nrows = [[\"workspace\"]]\n").unwrap();
         support::register_runtime_dir(&runtime_dir);
-        let child = Command::new(env!("CARGO_BIN_EXE_herdr"))
+        let child = Command::new(env!("CARGO_BIN_EXE_sy-term"))
             .arg("server")
             .env("XDG_CONFIG_HOME", &config_home)
             .env("XDG_RUNTIME_DIR", &runtime_dir)

@@ -168,7 +168,7 @@ test("reports a root session when only the local route changes", async () => {
   expect(requestParam(requests[0], "seq")).toBeUndefined();
 });
 
-test("retries an initial selection while Herdr detects the process", async () => {
+test("retries an initial selection while sy-term detects the process", async () => {
   const plugin = await loadPlugin();
   const tui = fakeApi();
   tui.addSession({ id: "session-a" });

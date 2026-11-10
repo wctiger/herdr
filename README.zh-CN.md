@@ -1,3 +1,5 @@
+> **注意：** 本文件来自上游 herdr，描述的是 herdr 而非 sy-term。sy-term 是 herdr 的离线分支，已移除所有需要联网的功能。请参阅 [README.md](README.md)。
+
 # herdr
 
 

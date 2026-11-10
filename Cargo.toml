@@ -1,12 +1,11 @@
 [package]
-name = "herdr"
+name = "sy-term"
 version = "0.9.5"
 edition = "2021"
 build = "build.rs"
-description = "terminal workspace manager for AI coding agents"
+# Offline fork of herdr (https://github.com/herdrdev/herdr), Apache-2.0.
+description = "offline terminal workspace manager for AI coding agents"
 license = "Apache-2.0"
-repository = "https://github.com/herdrdev/herdr"
-homepage = "https://herdr.dev"
 keywords = ["terminal", "tui", "ai", "agents", "multiplexer"]
 categories = ["command-line-utilities"]
 include = [
@@ -14,7 +13,6 @@ include = [
     "assets/sounds/*",
     "docs/next/api/herdr-api.schema.json",
     "skills/herdr/SKILL.md",
-    "distribution/install.ps1",
     "README.md",
     "LICENSE",
     "Cargo.toml",

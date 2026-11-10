@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn load_latest_keeps_future_version_previewable_before_restart() {
         let path = std::env::temp_dir().join(format!(
-            "herdr-release-notes-{}-{}.json",
+            "sy-term-release-notes-{}-{}.json",
             std::process::id(),
             "preview"
         ));
@@ -205,7 +205,7 @@ mod tests {
     #[test]
     fn load_latest_does_not_mark_older_saved_version_as_preview() {
         let path = std::env::temp_dir().join(format!(
-            "herdr-release-notes-{}-{}.json",
+            "sy-term-release-notes-{}-{}.json",
             std::process::id(),
             "stale"
         ));
@@ -223,7 +223,7 @@ mod tests {
     #[test]
     fn marking_current_version_seen_preserves_latest_notes() {
         let path = std::env::temp_dir().join(format!(
-            "herdr-release-notes-{}-{}.json",
+            "sy-term-release-notes-{}-{}.json",
             std::process::id(),
             "seen"
         ));
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn legacy_notes_without_show_on_startup_remain_available_as_latest() {
         let path = std::env::temp_dir().join(format!(
-            "herdr-release-notes-{}-{}.json",
+            "sy-term-release-notes-{}-{}.json",
             std::process::id(),
             "legacy"
         ));

@@ -58,7 +58,7 @@ fn run_shell_hook_with_env(
 ) -> Option<serde_json::Value> {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let socket_path = base.join("herdr.sock");
+    let socket_path = base.join("sy-term.sock");
     let listener = UnixListener::bind(&socket_path).unwrap();
     let hook_exited = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let server_hook_exited = hook_exited.clone();

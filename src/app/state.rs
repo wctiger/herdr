@@ -1043,7 +1043,7 @@ impl AppState {
             mode: Mode::Navigate,
             should_quit: false,
             request_client_config_reload: false,
-            worktree_directory: std::path::PathBuf::from("/tmp/herdr-worktrees"),
+            worktree_directory: std::path::PathBuf::from("/tmp/sy-term-worktrees"),
             latest_release_notes: None,
             product_announcement: None,
             view: ViewState {

@@ -263,13 +263,13 @@ try {
         -LocalPackageFormat "zip" `
         -LocalPackageIdentity "0.0.0-preview.local-package" `
         -LocalPackageSha256 $hash
-    if (-not (Test-Path -LiteralPath (Join-Path $localInstallDir "herdr.exe") -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $localInstallDir "sy-term.exe") -PathType Leaf)) {
         throw "installer did not activate the verified local package"
     }
     $env:HERDR_HOME = $herdrHome
 
     $required = @(
-        "herdr.exe",
+        "sy-term.exe",
         "conpty\herdr-conpty.json",
         "conpty\conpty.dll",
         "conpty\x64\OpenConsole.exe",
@@ -294,7 +294,7 @@ try {
     $pathWithoutHerdr = @(
         $env:Path.Split(";", [System.StringSplitOptions]::RemoveEmptyEntries) |
             Where-Object {
-                -not (Test-Path -LiteralPath (Join-Path $_ "herdr.exe") -PathType Leaf) -and
+                -not (Test-Path -LiteralPath (Join-Path $_ "sy-term.exe") -PathType Leaf) -and
                 -not (Test-Path -LiteralPath (Join-Path $_ "herdr.cmd") -PathType Leaf)
             }
     ) -join ";"
@@ -344,7 +344,7 @@ try {
     if (-not $downloadFailed) {
         throw "installer repair unexpectedly accepted a missing archive"
     }
-    if (-not (Test-Path -LiteralPath (Join-Path $releaseDir.FullName "herdr.exe") -PathType Leaf)) {
+    if (-not (Test-Path -LiteralPath (Join-Path $releaseDir.FullName "sy-term.exe") -PathType Leaf)) {
         throw "failed repair removed the existing release"
     }
 
@@ -438,14 +438,14 @@ try {
         if (-not $swapFailed) {
             throw "installer unexpectedly activated a release with a locked staged file"
         }
-        if (-not (Test-Path -LiteralPath (Join-Path $releaseDir.FullName "herdr.exe") -PathType Leaf)) {
+        if (-not (Test-Path -LiteralPath (Join-Path $releaseDir.FullName "sy-term.exe") -PathType Leaf)) {
             throw "failed activation did not restore the prior release"
         }
         if (@(Get-ChildItem -LiteralPath $releasesDir -Force -Directory -Filter ".backup.$($releaseDir.Name).*").Count -ne 0) {
             throw "failed activation stranded a release backup"
         }
         foreach ($junction in @($installDir, (Join-Path $herdrHome "packages\standalone\current"))) {
-            if (-not (Test-Path -LiteralPath (Join-Path $junction "herdr.exe") -PathType Leaf)) {
+            if (-not (Test-Path -LiteralPath (Join-Path $junction "sy-term.exe") -PathType Leaf)) {
                 throw "failed activation left an invalid installer junction at $junction"
             }
         }
@@ -547,7 +547,7 @@ try {
     }
     $resolvedHerdr = Get-Command herdr -CommandType Application -ErrorAction Stop
     if (-not $resolvedHerdr.Source.Equals(
-        (Join-Path $stableReleaseDir.FullName "herdr.exe"),
+        (Join-Path $stableReleaseDir.FullName "sy-term.exe"),
         [System.StringComparison]::OrdinalIgnoreCase
     )) {
         throw "installed command does not resolve through the active concrete release"

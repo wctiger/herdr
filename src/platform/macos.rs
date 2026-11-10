@@ -697,7 +697,7 @@ pub fn open_url(url: &str) -> std::io::Result<Option<std::process::Child>> {
 
 pub fn read_clipboard_image() -> Option<ClipboardImage> {
     let path = std::env::temp_dir().join(format!(
-        "herdr-clipboard-image-{}-{}.png",
+        "sy-term-clipboard-image-{}-{}.png",
         std::process::id(),
         unique_timestamp_nanos()
     ));
@@ -1352,7 +1352,7 @@ mod tests {
     #[test]
     fn terminal_notifier_success_skips_osascript() {
         let path = std::env::temp_dir().join(format!(
-            "herdr-terminal-notifier-args-{}",
+            "sy-term-terminal-notifier-args-{}",
             std::process::id()
         ));
         let script = "printf '%s:%s\\n' \"$0\" \"$*\" >> \"$HERDR_NOTIFY_ARGS\"";
@@ -1384,7 +1384,7 @@ mod tests {
     #[test]
     fn desktop_notification_falls_back_to_osascript_when_terminal_notifier_fails() {
         let path =
-            std::env::temp_dir().join(format!("herdr-osascript-args-{}", std::process::id()));
+            std::env::temp_dir().join(format!("sy-term-osascript-args-{}", std::process::id()));
         let script = r#"
 if [ "$0" = "terminal-notifier" ]; then
   exit 1
@@ -1413,12 +1413,12 @@ printf '%s\n' "$@" > "$HERDR_NOTIFY_ARGS"
 
     #[test]
     fn scrollback_editor_argv_preserves_unix_editor_shell_semantics() {
-        let path = std::path::Path::new("/tmp/herdr scrollback.txt");
+        let path = std::path::Path::new("/tmp/sy-term scrollback.txt");
         let argv = scrollback_editor_argv(path).unwrap();
 
         assert_eq!(argv[0], "/bin/sh");
         assert_eq!(argv[1], "-c");
         assert!(argv[2].contains("EDITOR:-vi"));
-        assert!(argv[2].contains("/tmp/herdr scrollback.txt"));
+        assert!(argv[2].contains("/tmp/sy-term scrollback.txt"));
     }
 }

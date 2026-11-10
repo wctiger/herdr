@@ -1,4 +1,4 @@
-# managed by herdr; reinstalling the integration replaces this file.
+# managed by sy-term; reinstalling the integration replaces this file.
 # HERDR_INTEGRATION_ID=letta
 # HERDR_INTEGRATION_VERSION=2
 
@@ -26,7 +26,7 @@ if ($sessionId -eq "default") {
     $sessionId = "default:" + [string]$payload.agent_id
 }
 
-$herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "herdr" } else { $env:HERDR_BIN_PATH }
+$herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "sy-term" } else { $env:HERDR_BIN_PATH }
 $source = if ($payload.is_new_session -eq $true) { "new" } else { "resume" }
 $commandArgs = @(
     "pane", "report-agent-session", $env:HERDR_PANE_ID,

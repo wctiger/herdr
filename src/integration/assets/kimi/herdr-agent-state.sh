@@ -1,5 +1,5 @@
 #!/bin/sh
-# managed by herdr; reinstalling the integration replaces this file.
+# managed by sy-term; reinstalling the integration replaces this file.
 # HERDR_INTEGRATION_ID=kimi
 # HERDR_INTEGRATION_VERSION=8
 

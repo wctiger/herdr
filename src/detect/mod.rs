@@ -973,7 +973,7 @@ mod tests {
     #[cfg(unix)]
     fn temp_detection_path(name: &str) -> std::path::PathBuf {
         let unique = format!(
-            "herdr-detect-tests-{}-{}-{}",
+            "sy-term-detect-tests-{}-{}-{}",
             name,
             std::process::id(),
             std::time::SystemTime::now()
@@ -1693,7 +1693,7 @@ mod tests {
             ("bun", "/home/can/.bun/bin/omp"),
             (
                 "bun.exe",
-                r"C:\Users\herdr\AppData\Roaming\npm\node_modules\@oh-my-pi\pi-coding-agent\dist\cli.js",
+                r"C:\Users\sy-term\AppData\Roaming\npm\node_modules\@oh-my-pi\pi-coding-agent\dist\cli.js",
             ),
         ] {
             let job = crate::platform::ForegroundJob {
@@ -1714,7 +1714,7 @@ mod tests {
                 "bun.exe",
                 &[
                     "bun.exe",
-                    r"C:\Users\herdr\AppData\Roaming\npm\node_modules\@oh-my-pi\pi-coding-agent\dist\setup.js",
+                    r"C:\Users\sy-term\AppData\Roaming\npm\node_modules\@oh-my-pi\pi-coding-agent\dist\setup.js",
                 ],
             )],
         };
@@ -1730,7 +1730,7 @@ mod tests {
                 "node.exe",
                 &[
                     "node.exe",
-                    "C:\\Users\\herdr\\AppData\\Roaming\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\cli.js",
+                    "C:\\Users\\sy-term\\AppData\\Roaming\\npm\\node_modules\\@earendil-works\\pi-coding-agent\\dist\\cli.js",
                 ],
             )],
         };
@@ -1752,8 +1752,8 @@ mod tests {
                 123,
                 "node.exe",
                 &[
-                    r"C:\Users\herdr\AppData\Local\pi-node\current\node.exe",
-                    r"C:\Users\herdr\AppData\Local\pi-node\current/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js",
+                    r"C:\Users\sy-term\AppData\Local\pi-node\current\node.exe",
+                    r"C:\Users\sy-term\AppData\Local\pi-node\current/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js",
                 ],
             )],
         };
@@ -1773,7 +1773,7 @@ mod tests {
                 "node.exe",
                 &[
                     "node.exe",
-                    "C:\\Users\\herdr\\AppData\\Roaming\\npm\\node_modules\\mastracode\\dist\\cli.js",
+                    "C:\\Users\\sy-term\\AppData\\Roaming\\npm\\node_modules\\mastracode\\dist\\cli.js",
                 ],
             )],
         };
@@ -1807,8 +1807,8 @@ mod tests {
     #[test]
     fn identify_agent_in_job_ignores_non_cli_pi_package_scripts() {
         for script in [
-            r"C:\Users\herdr\AppData\Roaming\npm\node_modules\@earendil-works\pi-coding-agent\scripts\build.js",
-            r"C:\Users\herdr\AppData\Local\pi-node\current\node_modules\@earendil-works\pi-coding-agent\dist\bundle\update.js",
+            r"C:\Users\sy-term\AppData\Roaming\npm\node_modules\@earendil-works\pi-coding-agent\scripts\build.js",
+            r"C:\Users\sy-term\AppData\Local\pi-node\current\node_modules\@earendil-works\pi-coding-agent\dist\bundle\update.js",
             r"C:\workspace\dist\bundle\cli.js",
             r"C:\workspace\node_modules\other-package\dist\bundle\cli.js",
             r"C:\workspace\node_modules\@earendil-works\pi-coding-agent\dist\cli.exe",
@@ -1837,7 +1837,7 @@ mod tests {
                     "/D",
                     "/S",
                     "/C",
-                    "C:\\Users\\herdr\\AppData\\Roaming\\npm\\codex.cmd --model gpt-5",
+                    "C:\\Users\\sy-term\\AppData\\Roaming\\npm\\codex.cmd --model gpt-5",
                 ],
             )],
         };
@@ -1859,7 +1859,7 @@ mod tests {
                     "powershell.exe",
                     "-NoProfile",
                     "-File",
-                    "C:\\Users\\herdr\\Documents\\PowerShell\\Scripts\\claude.ps1",
+                    "C:\\Users\\sy-term\\Documents\\PowerShell\\Scripts\\claude.ps1",
                 ],
             )],
         };

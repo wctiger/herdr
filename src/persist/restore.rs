@@ -1094,7 +1094,7 @@ mod tests {
     #[test]
     fn restored_worktree_space_membership_preserves_unavailable_checkout_and_rejects_replacement() {
         let root = std::env::temp_dir().join(format!(
-            "herdr-restored-worktree-{}-{}",
+            "sy-term-restored-worktree-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -1107,7 +1107,7 @@ mod tests {
         let checkout = root.join("checkout");
         let membership = crate::workspace::WorktreeSpaceMembership {
             key: "original-repo-key".into(),
-            label: "herdr".into(),
+            label: "sy-term".into(),
             repo_root: root.join("original-repo"),
             checkout_path: checkout.clone(),
             is_linked_worktree: true,

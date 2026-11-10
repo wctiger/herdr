@@ -1,4 +1,4 @@
-# managed by herdr; reinstalling the integration replaces this file.
+# managed by sy-term; reinstalling the integration replaces this file.
 # HERDR_INTEGRATION_ID=cursor
 # HERDR_INTEGRATION_VERSION=2
 
@@ -42,7 +42,7 @@ foreach ($name in @("session_id", "sessionId", "conversation_id", "conversationI
 if ([string]::IsNullOrWhiteSpace($sessionId)) { Exit-Hook }
 
 $seq = [DateTime]::UtcNow.Ticks
-$herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "herdr" } else { $env:HERDR_BIN_PATH }
+$herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "sy-term" } else { $env:HERDR_BIN_PATH }
 try {
     & $herdr pane report-agent-session $env:HERDR_PANE_ID --source herdr:cursor --agent cursor --seq $seq --agent-session-id $sessionId 2>$null | Out-Null
 } catch {

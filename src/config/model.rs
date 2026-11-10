@@ -16,6 +16,9 @@ pub const MAX_TOAST_DELAY_SECONDS: u64 = 3600;
 pub enum ToastDelivery {
     #[default]
     Off,
+    // "herdr" stays the canonical value for API compatibility; config files
+    // may use the product name instead.
+    #[serde(alias = "sy-term")]
     Herdr,
     Terminal,
     System,
@@ -1125,7 +1128,7 @@ impl Default for KeysConfig {
 impl Default for WorktreesConfig {
     fn default() -> Self {
         Self {
-            directory: "~/.herdr/worktrees".into(),
+            directory: "~/.sy-term/worktrees".into(),
         }
     }
 }
@@ -1220,6 +1223,7 @@ impl<'de> Deserialize<'de> for ToastConfig {
             delivery: Option<ToastDelivery>,
             enabled: Option<bool>,
             delay_seconds: Option<u64>,
+            #[serde(alias = "sy-term")]
             herdr: HerdrToastConfig,
             clipboard: ClipboardToastConfig,
         }
@@ -1455,14 +1459,14 @@ tab_bar_right_separator = " · "
     #[test]
     fn worktrees_directory_defaults_and_parses() {
         let default_config = Config::default();
-        assert_eq!(default_config.worktrees.directory, "~/.herdr/worktrees");
+        assert_eq!(default_config.worktrees.directory, "~/.sy-term/worktrees");
 
         let toml = r#"
 [worktrees]
-directory = "~/Projects/herdr-worktrees"
+directory = "~/Projects/sy-term-worktrees"
 "#;
         let config: Config = toml::from_str(toml).unwrap();
-        assert_eq!(config.worktrees.directory, "~/Projects/herdr-worktrees");
+        assert_eq!(config.worktrees.directory, "~/Projects/sy-term-worktrees");
     }
 
     #[test]
@@ -1762,7 +1766,7 @@ mouse_scroll_lines = 0
 delivery = "terminal"
 delay_seconds = 2
 
-[ui.toast.herdr]
+[ui.toast.sy-term]
 position = "top-left"
 
 [ui.toast.clipboard]

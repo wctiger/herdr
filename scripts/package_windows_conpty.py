@@ -261,7 +261,7 @@ def stage_bundle(
     if output_dir.exists():
         raise ValueError(f"output directory already exists: {output_dir}")
     if not herdr_exe.is_file():
-        raise ValueError(f"Herdr executable does not exist: {herdr_exe}")
+        raise ValueError(f"sy-term executable does not exist: {herdr_exe}")
 
     validate_static_msvc_runtime(herdr_exe.read_bytes(), herdr_exe.name)
 
@@ -275,7 +275,7 @@ def stage_bundle(
         validate_nuspec(archive, metadata["package"])
         staging = Path(temporary) / "bundle"
         staging.mkdir()
-        shutil.copy2(herdr_exe, staging / "herdr.exe")
+        shutil.copy2(herdr_exe, staging / "sy-term.exe")
 
         for item in bundle["files"]:
             try:
@@ -383,7 +383,7 @@ def build_local_bundle(metadata_path: Path) -> None:
             elif (
                 message.get("reason") == "compiler-artifact"
                 and message["manifest_path"] == str(PROJECT_ROOT / "Cargo.toml")
-                and message["target"]["name"] == "herdr"
+                and message["target"]["name"] == "sy-term"
                 and "bin" in message["target"]["kind"]
             ):
                 executable = Path(message["executable"])
@@ -391,7 +391,7 @@ def build_local_bundle(metadata_path: Path) -> None:
     if status:
         raise SystemExit(status)
     if executable is None:
-        raise ValueError("cargo did not report the Herdr executable")
+        raise ValueError("cargo did not report the sy-term executable")
 
     target = Path(os.environ.get("CARGO_TARGET_DIR", "target"))
     if not target.is_absolute():
@@ -405,7 +405,7 @@ def build_local_bundle(metadata_path: Path) -> None:
 
 
 def expected_stage_files(metadata: dict[str, Any], architecture: str) -> set[str]:
-    files = {"herdr.exe", MARKER_PATH.as_posix()}
+    files = {"sy-term.exe", MARKER_PATH.as_posix()}
     files.update(item["destination"] for item in metadata["bundles"][architecture]["files"])
     files.update(item["destination"] for item in metadata["notices"])
     return files
@@ -428,7 +428,7 @@ def validate_stage(metadata_path: Path, architecture: str, stage_dir: Path) -> N
     # The executable is not hash-pinned (it changes every build), so re-check
     # it here to cover a direct archive of an existing stage or a swap after
     # staging.
-    validate_static_msvc_runtime((stage_dir / "herdr.exe").read_bytes(), "herdr.exe")
+    validate_static_msvc_runtime((stage_dir / "sy-term.exe").read_bytes(), "sy-term.exe")
     for item in metadata["bundles"][architecture]["files"]:
         path = stage_dir / PurePosixPath(item["destination"])
         actual_hash = sha256_file(path)

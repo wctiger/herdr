@@ -1,0 +1,21 @@
+sy-term
+Copyright the herdr authors.
+
+This product is a modified version of herdr
+(https://github.com/herdrdev/herdr), licensed under the Apache License,
+Version 2.0. See LICENSE for the full license text.
+
+Modifications made in this fork:
+
+- Removed features that require network access: self-update, update
+  channels and background version checks, product announcements, remote
+  attach and saved machines over SSH, the online agent-detection manifest
+  catalog, and GitHub plugin installation and update.
+- Renamed the product, binary, process, and configuration, state, log and
+  socket paths from herdr to sy-term. Environment variables, protocol
+  identifiers, hook source labels and the plugin manifest format keep their
+  original herdr names for compatibility.
+
+This product includes third-party components distributed with herdr,
+including the vendored libghostty-vt and portable-pty sources under vendor/,
+each under its own license.

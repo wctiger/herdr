@@ -252,15 +252,17 @@ mod tests {
     #[test]
     fn local_session_target_resolves_named_session_socket() {
         let client = ApiClient::for_target(ConnectionTarget::LocalSession(Some("work".into())));
-        assert!(client.socket_path().ends_with("sessions/work/herdr.sock"));
+        assert!(client.socket_path().ends_with("sessions/work/sy-term.sock"));
     }
 
     #[test]
     fn status_timeout_closes_a_stalled_probe() {
         #[cfg(unix)]
         use interprocess::local_socket::traits::Listener as _;
-        let path =
-            std::env::temp_dir().join(format!("herdr-status-timeout-{}.sock", std::process::id()));
+        let path = std::env::temp_dir().join(format!(
+            "sy-term-status-timeout-{}.sock",
+            std::process::id()
+        ));
         let listener = crate::ipc::bind_private_local_listener(&path).unwrap();
         let server = std::thread::spawn(move || {
             let stream = listener.accept().unwrap();
@@ -286,7 +288,7 @@ mod tests {
 
     #[test]
     fn socket_path_target_uses_explicit_path() {
-        let path = PathBuf::from("/tmp/herdr-test.sock");
+        let path = PathBuf::from("/tmp/sy-term-test.sock");
         let client = ApiClient::for_target(ConnectionTarget::SocketPath(path.clone()));
         assert_eq!(client.socket_path(), path);
     }

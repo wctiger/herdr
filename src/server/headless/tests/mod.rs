@@ -551,10 +551,10 @@ fn api_window_title_wins_until_it_is_cleared() {
     let (mut server, control_rx) = window_title_test_server();
     server.app.configure_window_title("{workspace}");
 
-    server.handle_client_window_title_api("set".into(), Some("herdr api".into()));
+    server.handle_client_window_title_api("set".into(), Some("sy-term api".into()));
     assert_eq!(
         next_window_title(&control_rx),
-        Some(Some("herdr api".to_string()))
+        Some(Some("sy-term api".to_string()))
     );
 
     server.app.state.workspaces[0].custom_name = Some("ops".into());
@@ -576,10 +576,10 @@ fn clearing_the_api_title_falls_back_to_herdr_when_window_titles_are_disabled() 
     let (mut server, control_rx) = window_title_test_server();
     server.app.configure_window_title("");
 
-    server.handle_client_window_title_api("set".into(), Some("herdr api".into()));
+    server.handle_client_window_title_api("set".into(), Some("sy-term api".into()));
     assert_eq!(
         next_window_title(&control_rx),
-        Some(Some("herdr api".to_string()))
+        Some(Some("sy-term api".to_string()))
     );
 
     server.handle_client_window_title_api("clear".into(), None);
@@ -3334,7 +3334,7 @@ async fn worktree_discovery_does_not_block_client_typing() {
     let (runtime, mut input_rx) =
         crate::terminal::TerminalRuntime::test_with_channel_and_scrollback_bytes(80, 24, 0, b"", 4);
     workspace.insert_test_runtime(pane_id, runtime);
-    let repo = std::env::temp_dir().join(format!("herdr-blocked-git-{}", workspace.id));
+    let repo = std::env::temp_dir().join(format!("sy-term-blocked-git-{}", workspace.id));
     workspace.identity_cwd = repo.clone();
     workspace.cached_git_space = Some(crate::workspace::GitSpaceMetadata {
         key: repo.display().to_string(),
@@ -3434,7 +3434,7 @@ async fn worktree_discovery_does_not_block_client_typing() {
 async fn deferred_worktree_open_disconnect_keeps_other_clients_focus() {
     let mut server = test_headless_server();
     let mut source = crate::workspace::Workspace::test_new("pending-open-source");
-    let repo = std::env::temp_dir().join(format!("herdr-disconnected-open-{}", source.id));
+    let repo = std::env::temp_dir().join(format!("sy-term-disconnected-open-{}", source.id));
     let checkout = repo.with_extension("checkout");
     let git = |args: &[&str]| {
         let output = std::process::Command::new("git")
@@ -3452,9 +3452,9 @@ async fn deferred_worktree_open_disconnect_keeps_other_clients_focus() {
         "-C",
         repo.to_str().unwrap(),
         "-c",
-        "user.name=Herdr Test",
+        "user.name=sy-term Test",
         "-c",
-        "user.email=herdr@example.invalid",
+        "user.email=sy-term@example.invalid",
         "commit",
         "--quiet",
         "--allow-empty",
@@ -5017,7 +5017,7 @@ fn windows_shutdown_probe_preserves_panes_and_agent_sessions() {
             .map(|key| (key, std::env::var_os(key))),
     );
     let config_home = std::env::temp_dir().join(format!(
-        "herdr-shutdown-{}-{}",
+        "sy-term-shutdown-{}-{}",
         std::process::id(),
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -5380,13 +5380,13 @@ fn terminal_attach_client_exits_when_worktree_runtime_restore_fails() {
 #[test]
 fn terminal_attach_client_exits_when_worktree_remove_succeeds() {
     let mut server = test_headless_server();
-    let checkout = PathBuf::from("/repo/herdr-issue");
+    let checkout = PathBuf::from("/repo/sy-term-issue");
     let parent = crate::workspace::Workspace::test_new("parent");
     let mut workspace = crate::workspace::Workspace::test_new("worktree");
     workspace.worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
         key: "repo-key".into(),
-        label: "herdr".into(),
-        repo_root: "/repo/herdr".into(),
+        label: "sy-term".into(),
+        repo_root: "/repo/sy-term".into(),
         checkout_path: checkout.clone(),
         is_linked_worktree: true,
     });
@@ -7465,7 +7465,7 @@ fn oversized_paste_rejection_notifies_only_the_sending_client() {
     ) {
         ServerMessage::ClientShellError { message } => assert_eq!(
             message,
-            "Paste rejected: Input message is 5000012 bytes; Herdr's limit is 1048576 bytes"
+            "Paste rejected: Input message is 5000012 bytes; sy-term's limit is 1048576 bytes"
         ),
         other => panic!("expected client shell paste error, got {other:?}"),
     }
@@ -7495,7 +7495,7 @@ fn oversized_paste_rejection_notifies_only_the_sending_client() {
     ) {
         ServerMessage::ClientShellError { message } => assert_eq!(
             message,
-            "Paste rejected: Input message is 7000000 bytes; Herdr's limit is 1048576 bytes"
+            "Paste rejected: Input message is 7000000 bytes; sy-term's limit is 1048576 bytes"
         ),
         other => panic!("expected client shell paste error, got {other:?}"),
     }

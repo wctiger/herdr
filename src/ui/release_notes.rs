@@ -155,7 +155,7 @@ fn release_notes_preview_line_entries<'a>(
     let instruction = if install_command.is_empty() {
         "Install the new version manually, then restart.".to_string()
     } else {
-        format!("detach, run `{install_command}`, then run Herdr again to reconnect")
+        format!("detach, run `{install_command}`, then run sy-term again to reconnect")
     };
     let (instruction_width, mut instruction_spans) =
         release_notes_inline_spans(&instruction, text_style, inline_code_style);
@@ -275,11 +275,11 @@ mod tests {
     #[test]
     fn release_notes_inline_code_spans_are_styled_without_backticks() {
         let palette = Palette::catppuccin();
-        let lines = release_notes_lines("- `herdr pane run ...` now works", &palette);
+        let lines = release_notes_lines("- `sy-term pane run ...` now works", &palette);
 
         assert_eq!(lines.len(), 1);
-        assert_eq!(line_text(&lines[0].1), " • herdr pane run ... now works");
-        assert_eq!(lines[0].1.spans[1].content.as_ref(), "herdr pane run ...");
+        assert_eq!(line_text(&lines[0].1), " • sy-term pane run ... now works");
+        assert_eq!(lines[0].1.spans[1].content.as_ref(), "sy-term pane run ...");
         assert_eq!(lines[0].1.spans[1].style.fg, Some(palette.accent));
         assert_eq!(lines[0].1.spans[1].style.bg, Some(palette.surface0));
     }
@@ -303,7 +303,7 @@ mod tests {
     #[test]
     fn release_notes_preview_lines_show_update_steps() {
         let palette = Palette::catppuccin();
-        let lines = release_notes_preview_line_entries("herdr update", &palette)
+        let lines = release_notes_preview_line_entries("sy-term update", &palette)
             .into_iter()
             .map(|(_, line)| line)
             .collect::<Vec<_>>();
@@ -312,11 +312,11 @@ mod tests {
         assert_eq!(line_text(&lines[0]), " ● update ready");
         assert_eq!(
             line_text(&lines[1]),
-            " detach, run herdr update, then run Herdr again to reconnect"
+            " detach, run sy-term update, then run sy-term again to reconnect"
         );
         assert_eq!(lines[0].spans[1].style.fg, Some(palette.accent));
         assert_eq!(lines[0].spans[2].style.fg, Some(palette.text));
-        assert_eq!(lines[1].spans[2].content.as_ref(), "herdr update");
+        assert_eq!(lines[1].spans[2].content.as_ref(), "sy-term update");
         assert_eq!(lines[1].spans[2].style.fg, Some(palette.accent));
         assert_eq!(lines[1].spans[2].style.bg, Some(palette.surface0));
     }
@@ -331,12 +331,12 @@ mod tests {
             preview: true,
         };
 
-        let lines = release_notes_display_lines(&notes, "herdr update", &palette);
+        let lines = release_notes_display_lines(&notes, "sy-term update", &palette);
 
         assert_eq!(line_text(&lines[0].1), " ● update ready");
         assert_eq!(
             line_text(&lines[1].1),
-            " detach, run herdr update, then run Herdr again to reconnect"
+            " detach, run sy-term update, then run sy-term again to reconnect"
         );
         assert_eq!(line_text(&lines[2].1), "");
         assert_eq!(line_text(&lines[3].1), " ADDED");

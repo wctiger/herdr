@@ -36,7 +36,7 @@ pub(crate) const EXPERIMENTAL_INTEGRATION_TARGET_LABELS: &[&str] = &["letta"];
 const PI_EXTENSION_INSTALL_NAME: &str = "herdr-agent-state.ts";
 const PI_EXTENSION_ASSET: &str = include_str!("assets/pi/herdr-agent-state.ts");
 const PI_INTEGRATION_VERSION: u32 = 9;
-const OMP_EXTENSION_INSTALL_NAME: &str = "herdr-omp-agent-state.ts";
+const OMP_EXTENSION_INSTALL_NAME: &str = "sy-term-omp-agent-state.ts";
 const OMP_EXTENSION_ASSET: &str = include_str!("assets/omp/herdr-agent-state.ts");
 const OMP_INTEGRATION_VERSION: u32 = 10;
 const CLAUDE_HOOK_INSTALL_NAME: &str = if cfg!(windows) {
@@ -72,8 +72,8 @@ const KIMI_HOOK_ASSET: &str = if cfg!(windows) {
     include_str!("assets/kimi/herdr-agent-state.sh")
 };
 const KIMI_INTEGRATION_VERSION: u32 = 8;
-const KIMI_CONFIG_BLOCK_BEGIN: &str = "# >>> herdr kimi integration";
-const KIMI_CONFIG_BLOCK_END: &str = "# <<< herdr kimi integration";
+const KIMI_CONFIG_BLOCK_BEGIN: &str = "# >>> sy-term kimi integration";
+const KIMI_CONFIG_BLOCK_END: &str = "# <<< sy-term kimi integration";
 const KIMI_MIN_VERSION: &str = "0.14.0";
 const KIMI_ASK_USER_QUESTION_MATCHER: &str = "^AskUserQuestion$";
 const KIMI_OTHER_TOOL_MATCHER: &str = "^(?!AskUserQuestion$).*$";
@@ -313,7 +313,7 @@ const GROK_HOOK_INSTALL_NAME: &str = if cfg!(windows) {
 } else {
     "herdr-agent-state.sh"
 };
-const GROK_HOOK_CONFIG_INSTALL_NAME: &str = "herdr.json";
+const GROK_HOOK_CONFIG_INSTALL_NAME: &str = "sy-term.json";
 const GROK_HOOK_ASSET: &str = if cfg!(windows) {
     include_str!("assets/grok/herdr-agent-state.ps1")
 } else {
