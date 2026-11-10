@@ -687,7 +687,7 @@ mod windows_tests {
 
     fn local_stream_pair(name: &str) -> (LocalStream, LocalStream, PathBuf) {
         let path = std::env::temp_dir().join(format!(
-            "sy-term-api-{name}-{}-{}.sock",
+            "syt-api-{name}-{}-{}.sock",
             std::process::id(),
             Instant::now().elapsed().as_nanos()
         ));
@@ -1066,7 +1066,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("sy-term-{name}-{}-{nanos}", std::process::id()))
+        std::env::temp_dir().join(format!("syt-{name}-{}-{nanos}", std::process::id()))
     }
 
     fn read_line(stream: &mut LocalStream) -> String {
@@ -1214,7 +1214,7 @@ mod tests {
     #[test]
     fn socket_path_prefers_explicit_env_override() {
         let _guard = env_lock().lock().unwrap();
-        let unique = format!("/tmp/sy-term-test-{}.sock", std::process::id());
+        let unique = format!("/tmp/syt-test-{}.sock", std::process::id());
         std::env::remove_var(crate::session::SESSION_ENV_VAR);
         crate::session::clear_explicit_session_for_test();
         std::env::set_var(crate::api::SOCKET_PATH_ENV_VAR, &unique);

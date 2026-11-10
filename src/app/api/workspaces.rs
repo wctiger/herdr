@@ -425,7 +425,7 @@ mod tests {
         shutdown_test_runtimes(&mut app);
 
         let focused_cwd = std::env::temp_dir().join(format!(
-            "sy-term-ws-follow-{}-{}",
+            "syt-ws-follow-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -491,7 +491,7 @@ mod tests {
         shutdown_test_runtimes(&mut app);
 
         let source_cwd =
-            std::env::temp_dir().join(format!("sy-term-ws-explicit-source-{}", std::process::id()));
+            std::env::temp_dir().join(format!("syt-ws-explicit-source-{}", std::process::id()));
         std::fs::create_dir_all(&source_cwd).unwrap();
         let pane_id = app.state.workspaces[1].focused_pane_id().unwrap();
         let terminal_id = app.state.workspaces[1]
@@ -571,7 +571,7 @@ mod tests {
             key: "repo-key".into(),
             label: "sy-term".into(),
             repo_root: "/repo/sy-term".into(),
-            checkout_path: "/repo/sy-term-issue".into(),
+            checkout_path: "/repo/syt-issue".into(),
             is_linked_worktree: true,
         });
         app

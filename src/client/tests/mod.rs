@@ -348,7 +348,7 @@ impl TempImageFile {
             .unwrap()
             .as_nanos();
         let path = std::env::temp_dir().join(format!(
-            "sy-term-client-drop-{name_fragment}-{}-{nanos}.{extension}",
+            "syt-client-drop-{name_fragment}-{}-{nanos}.{extension}",
             std::process::id()
         ));
         std::fs::write(&path, bytes).unwrap();
@@ -670,7 +670,7 @@ fn sound_from_notify_message_rejects_unknown_payloads() {
 fn reload_local_client_config_refreshes_local_client_presentation_state() {
     let _guard = crate::config::test_config_env_lock().lock().unwrap();
     let path = std::env::temp_dir().join(format!(
-        "sy-term-client-config-reload-{}-{}.toml",
+        "syt-client-config-reload-{}-{}.toml",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -708,7 +708,7 @@ fn reload_local_client_config_refreshes_local_client_presentation_state() {
 fn reload_local_client_config_keeps_ui_preferences_when_ui_is_invalid() {
     let _guard = crate::config::test_config_env_lock().lock().unwrap();
     let path = std::env::temp_dir().join(format!(
-        "sy-term-client-invalid-ui-reload-{}-{}.toml",
+        "syt-client-invalid-ui-reload-{}-{}.toml",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

@@ -2847,7 +2847,7 @@ mod tests {
             key: "repo-key".into(),
             label: "sy-term".into(),
             repo_root: "/repo/sy-term".into(),
-            checkout_path: "/repo/sy-term-issue".into(),
+            checkout_path: "/repo/syt-issue".into(),
             is_linked_worktree: true,
         });
         state.selected = 0;
@@ -4083,8 +4083,7 @@ mod tests {
             .unwrap()
             .attached_terminal_id
             .clone();
-        let cwd =
-            std::env::temp_dir().join(format!("sy-term-cwd-report-test-{}", std::process::id()));
+        let cwd = std::env::temp_dir().join(format!("syt-cwd-report-test-{}", std::process::id()));
         std::fs::create_dir_all(&cwd).unwrap();
         state.session_dirty = false;
 

@@ -4475,7 +4475,7 @@ mod tests {
             .expect("clock should be after unix epoch")
             .as_nanos();
         let cwd = std::env::temp_dir().join(format!(
-            "sy-term-reported-cwd-cache-{}-{stamp}",
+            "syt-reported-cwd-cache-{}-{stamp}",
             std::process::id()
         ));
         std::fs::create_dir(&cwd).expect("create reported cwd");
@@ -4504,7 +4504,7 @@ mod tests {
             .expect("clock should be after unix epoch")
             .as_nanos();
         let base = std::env::temp_dir().join(format!(
-            "sy-term-process-cwd-no-stat-{}-{stamp}",
+            "syt-process-cwd-no-stat-{}-{stamp}",
             std::process::id()
         ));
         let private = base.join("private");
@@ -4580,7 +4580,7 @@ mod tests {
             })
             .unwrap();
         let output_path = std::env::temp_dir().join(format!(
-            "sy-term-pane-term-test-{}-{}.txt",
+            "syt-pane-term-test-{}-{}.txt",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -4676,7 +4676,7 @@ mod tests {
     #[test]
     fn windows_default_pane_shell_prefers_pwsh_on_path() {
         let dir = std::env::temp_dir().join(format!(
-            "sy-term-windows-default-shell-pwsh-{}",
+            "syt-windows-default-shell-pwsh-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
@@ -4695,7 +4695,7 @@ mod tests {
     #[test]
     fn windows_default_pane_shell_falls_back_to_inbox_powershell() {
         let dir = std::env::temp_dir().join(format!(
-            "sy-term-windows-default-shell-fallback-{}",
+            "syt-windows-default-shell-fallback-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
@@ -4713,7 +4713,7 @@ mod tests {
     #[test]
     fn windows_default_pane_shell_rejects_non_executable_pe_images() {
         let dir = std::env::temp_dir().join(format!(
-            "sy-term-windows-default-shell-invalid-{}",
+            "syt-windows-default-shell-invalid-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
@@ -4794,7 +4794,7 @@ mod tests {
     #[test]
     fn windows_executable_file_rejects_arm64_image_on_amd64_host() {
         let dir = std::env::temp_dir().join(format!(
-            "sy-term-windows-default-shell-arm64-{}",
+            "syt-windows-default-shell-arm64-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
@@ -4814,7 +4814,7 @@ mod tests {
     #[test]
     fn windows_default_pane_shell_skips_invalid_pwsh_candidates() {
         let base = std::env::temp_dir().join(format!(
-            "sy-term-windows-default-shell-skip-{}",
+            "syt-windows-default-shell-skip-{}",
             std::process::id()
         ));
         let invalid_dir = base.join("invalid");
@@ -5146,7 +5146,7 @@ mod tests {
     fn login_shell_builder_resolves_bare_shell_names_from_path() {
         let _lock = crate::integration::integration_env_lock();
         let base = std::env::temp_dir().join(format!(
-            "sy-term-login-shell-path-{}-{}",
+            "syt-login-shell-path-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -6593,7 +6593,7 @@ mod tests {
     #[tokio::test]
     async fn spawned_pane_process_sees_fish_handle_reflow() {
         let output_dir = std::env::temp_dir().join(format!(
-            "sy-term-fish-handle-reflow-test-{}-{}",
+            "syt-fish-handle-reflow-test-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

@@ -523,7 +523,7 @@ mod tests {
 
         let _guard = env_lock().lock().unwrap();
         let config_home =
-            std::env::temp_dir().join(format!("sy-term-session-denied-{}", std::process::id()));
+            std::env::temp_dir().join(format!("syt-session-denied-{}", std::process::id()));
         let previous_config_home = std::env::var_os("XDG_CONFIG_HOME");
         std::env::set_var("XDG_CONFIG_HOME", &config_home);
         let denied_path = api_socket_path_for(Some("denied"));
@@ -586,7 +586,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("sy-term-{name}-{}-{nanos}", std::process::id()))
+        std::env::temp_dir().join(format!("syt-{name}-{}-{nanos}", std::process::id()))
     }
 
     #[cfg(unix)]
@@ -854,7 +854,7 @@ mod tests {
     fn configure_from_args_maps_default_session_name_to_default_path() {
         let _guard = env_lock().lock().unwrap();
         let config_home =
-            std::env::temp_dir().join(format!("sy-term-session-default-{}", std::process::id()));
+            std::env::temp_dir().join(format!("syt-session-default-{}", std::process::id()));
         std::env::set_var("XDG_CONFIG_HOME", &config_home);
         std::env::set_var(SESSION_ENV_VAR, "work");
         clear_explicit_session_for_test();
@@ -906,10 +906,8 @@ mod tests {
     #[test]
     fn env_default_session_name_uses_default_path() {
         let _guard = env_lock().lock().unwrap();
-        let config_home = std::env::temp_dir().join(format!(
-            "sy-term-env-session-default-{}",
-            std::process::id()
-        ));
+        let config_home =
+            std::env::temp_dir().join(format!("syt-env-session-default-{}", std::process::id()));
         std::env::set_var("XDG_CONFIG_HOME", &config_home);
         std::env::remove_var(crate::api::SOCKET_PATH_ENV_VAR);
         std::env::set_var(SESSION_ENV_VAR, DEFAULT_SESSION_NAME);
@@ -1005,7 +1003,7 @@ mod tests {
     fn explicit_session_socket_ignores_inherited_socket_override() {
         let _guard = env_lock().lock().unwrap();
         let config_home =
-            std::env::temp_dir().join(format!("sy-term-session-precedence-{}", std::process::id()));
+            std::env::temp_dir().join(format!("syt-session-precedence-{}", std::process::id()));
         std::env::set_var("XDG_CONFIG_HOME", &config_home);
         std::env::set_var(SESSION_ENV_VAR, "work");
         EXPLICIT_SESSION_REQUESTED.store(true, Ordering::Relaxed);
@@ -1143,7 +1141,7 @@ mod tests {
     fn list_sessions_skips_reserved_default_directory() {
         let _guard = env_lock().lock().unwrap();
         let config_home =
-            std::env::temp_dir().join(format!("sy-term-session-list-{}", std::process::id()));
+            std::env::temp_dir().join(format!("syt-session-list-{}", std::process::id()));
         let sessions_dir = config_home
             .join(crate::config::app_dir_name())
             .join("sessions");

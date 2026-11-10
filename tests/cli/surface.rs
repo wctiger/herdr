@@ -561,7 +561,7 @@ fn api_snapshot_prints_live_session_snapshot() {
 fn api_schema_output_writes_bundled_schema_to_file() {
     let base = unique_test_dir();
     fs::create_dir_all(&base).unwrap();
-    let schema_path = base.join("sy-term-api.schema.json");
+    let schema_path = base.join("syt-api.schema.json");
 
     let output = Command::new(env!("CARGO_BIN_EXE_sy-term"))
         .args(["api", "schema", "--output"])

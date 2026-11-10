@@ -392,7 +392,7 @@ mod tests {
             args: &[
                 "-c",
                 "printf '%s' \"$$\" > \"$1\"; exec sleep 2",
-                "sy-term-sound-timeout-test",
+                "syt-sound-timeout-test",
             ],
         };
         let result = player.output_with_timeout(&pid_path, Duration::from_millis(100));
@@ -421,7 +421,7 @@ mod tests {
             args: &[
                 "-c",
                 "i=0; while [ \"$i\" -lt 8192 ]; do printf 0123456789abcdef; i=$((i + 1)); done; i=0; while [ \"$i\" -lt 8192 ]; do printf fedcba9876543210; i=$((i + 1)); done >&2; exit 7",
-                "sy-term-sound-output-test",
+                "syt-sound-output-test",
             ],
         };
 

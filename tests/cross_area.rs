@@ -27,7 +27,7 @@ fn unique_test_dir() -> PathBuf {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     PathBuf::from(format!(
-        "/tmp/sy-term-cross-area-test-{}-{nanos}",
+        "/tmp/syt-cross-area-test-{}-{nanos}",
         std::process::id()
     ))
 }

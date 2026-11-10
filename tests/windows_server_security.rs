@@ -88,7 +88,7 @@ fn server_integrity_requires_startup_consent_on_both_endpoints() {
     };
 
     let directory = std::env::temp_dir().join(format!(
-        "sy-term-server-integrity-{}-{}",
+        "syt-server-integrity-{}-{}",
         std::process::id(),
         SystemTime::now()
             .duration_since(UNIX_EPOCH)

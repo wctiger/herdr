@@ -874,7 +874,7 @@ mod tests {
             .unwrap_or_default()
             .as_nanos();
         std::env::temp_dir().join(format!(
-            "sy-term-watchdog-scoping-{label}-{}-{unique}",
+            "syt-watchdog-scoping-{label}-{}-{unique}",
             std::process::id()
         ))
     }

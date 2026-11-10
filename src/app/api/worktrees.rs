@@ -603,7 +603,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        std::env::temp_dir().join(format!("sy-term-{name}-{}-{nanos}", std::process::id()))
+        std::env::temp_dir().join(format!("syt-{name}-{}-{nanos}", std::process::id()))
     }
 
     fn run_git(repo: &Path, args: &[&str]) {
@@ -2633,7 +2633,7 @@ mod tests {
     #[test]
     fn deferred_api_background_worktree_remove_preserves_focused_workspace() {
         let mut app = test_app();
-        let checkout = PathBuf::from("/repo/sy-term-issue");
+        let checkout = PathBuf::from("/repo/syt-issue");
         let membership = crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
             label: "sy-term".into(),
@@ -2705,7 +2705,7 @@ mod tests {
     async fn deferred_api_worktree_remove_emits_removed_after_workspace_changes() {
         let event_hub = crate::api::EventHub::default();
         let mut app = test_app_with_event_hub(event_hub.clone());
-        let checkout = PathBuf::from("/repo/sy-term-issue");
+        let checkout = PathBuf::from("/repo/syt-issue");
         let mut child = Workspace::test_new("child");
         child.worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),

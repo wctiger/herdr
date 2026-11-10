@@ -973,7 +973,7 @@ mod tests {
     #[cfg(unix)]
     fn temp_detection_path(name: &str) -> std::path::PathBuf {
         let unique = format!(
-            "sy-term-detect-tests-{}-{}-{}",
+            "syt-detect-tests-{}-{}-{}",
             name,
             std::process::id(),
             std::time::SystemTime::now()

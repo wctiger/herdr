@@ -519,7 +519,7 @@ fn wait_for_replacement_server_pid(runtime_dir: &Path, old_pid: u32, timeout: Du
 
 #[cfg(target_os = "macos")]
 fn wait_for_replacement_server_pid(_runtime_dir: &Path, old_pid: u32, timeout: Duration) -> u32 {
-    let handoff_socket_pattern = format!("sy-term-handoff-{old_pid}.sock");
+    let handoff_socket_pattern = format!("syt-handoff-{old_pid}.sock");
     let deadline = Instant::now() + timeout;
     let mut last_stdout = String::new();
     while Instant::now() < deadline {

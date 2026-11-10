@@ -42,7 +42,7 @@ fn attribute(file: &std::fs::File, name: &CStr) -> Option<Vec<u8>> {
 
 #[test]
 fn config_metadata_preserves_ownership_and_acl_without_inheriting_extra_access() {
-    let dir = std::env::temp_dir().join(format!("sy-term-config-acl-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!("syt-config-acl-{}", std::process::id()));
     std::fs::create_dir(&dir).unwrap();
     // Linux UAPI posix_acl_xattr_header/entry, version 2, little-endian fields.
     // Owner rw, named user 65534 read, group none, mask read, other none.

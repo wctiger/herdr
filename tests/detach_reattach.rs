@@ -40,7 +40,7 @@ fn unique_test_dir() -> PathBuf {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     PathBuf::from(format!(
-        "/tmp/sy-term-detach-test-{}-{nanos}",
+        "/tmp/syt-detach-test-{}-{nanos}",
         std::process::id()
     ))
 }

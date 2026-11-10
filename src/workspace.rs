@@ -1588,7 +1588,7 @@ mod tests {
             .expect("clock should be after unix epoch")
             .as_nanos();
         let root = std::env::temp_dir().join(format!(
-            "sy-term-workspace-label-cache-{}-{stamp}",
+            "syt-workspace-label-cache-{}-{stamp}",
             std::process::id()
         ));
         let cwd = root.join("deep/nested");
@@ -1633,14 +1633,14 @@ mod tests {
         let mut terminals = HashMap::new();
         terminals.insert(
             terminal_id.clone(),
-            TerminalState::new(terminal_id, PathBuf::from("/sy-term-test/pion")),
+            TerminalState::new(terminal_id, PathBuf::from("/syt-test/pion")),
         );
         let terminal_runtimes = TerminalRuntimeRegistry::new();
 
         assert_eq!(ws.display_name_from(&terminals, &terminal_runtimes), "pion");
         assert_eq!(
             ws.resolved_identity_cwd_from(&terminals, &terminal_runtimes),
-            Some(PathBuf::from("/sy-term-test/pion"))
+            Some(PathBuf::from("/syt-test/pion"))
         );
     }
 

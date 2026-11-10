@@ -984,7 +984,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("sy-term-{name}-{}-{stamp}", std::process::id()))
+        std::env::temp_dir().join(format!("syt-{name}-{}-{stamp}", std::process::id()))
     }
 
     fn config_env_lock() -> &'static Mutex<()> {
@@ -993,7 +993,7 @@ mod tests {
 
     fn temp_config_path(name: &str) -> std::path::PathBuf {
         let unique = format!(
-            "sy-term-{name}-{}-{}",
+            "syt-{name}-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -2124,10 +2124,10 @@ mod tests {
     fn new_terminal_cwd_follow_uses_source_cwd() {
         let cwd = creation::resolve_new_terminal_cwd(
             &crate::config::NewTerminalCwdConfig::Follow,
-            Some(std::path::PathBuf::from("/tmp/sy-term-source")),
+            Some(std::path::PathBuf::from("/tmp/syt-source")),
         );
 
-        assert_eq!(cwd, std::path::PathBuf::from("/tmp/sy-term-source"));
+        assert_eq!(cwd, std::path::PathBuf::from("/tmp/syt-source"));
     }
 
     #[test]
@@ -2145,11 +2145,11 @@ mod tests {
     #[test]
     fn new_terminal_cwd_path_uses_configured_path() {
         let cwd = creation::resolve_new_terminal_cwd(
-            &crate::config::NewTerminalCwdConfig::Path("/tmp/sy-term-fixed".into()),
-            Some(std::path::PathBuf::from("/tmp/sy-term-source")),
+            &crate::config::NewTerminalCwdConfig::Path("/tmp/syt-fixed".into()),
+            Some(std::path::PathBuf::from("/tmp/syt-source")),
         );
 
-        assert_eq!(cwd, std::path::PathBuf::from("/tmp/sy-term-fixed"));
+        assert_eq!(cwd, std::path::PathBuf::from("/tmp/syt-fixed"));
     }
 
     #[test]
@@ -2817,7 +2817,7 @@ mod tests {
             key: "repo-key".into(),
             label: "sy-term".into(),
             repo_root: "/repo/sy-term".into(),
-            checkout_path: "/repo/sy-term-child".into(),
+            checkout_path: "/repo/syt-child".into(),
             is_linked_worktree: true,
         });
         app.state.workspaces = vec![parent, child];
