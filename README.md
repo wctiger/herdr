@@ -65,6 +65,9 @@ cargo build --release
 The first build fetches Zig package dependencies. To build fully offline,
 populate the Zig package cache on a connected machine first and copy it over.
 
+See [BUILDING-WINDOWS.md](BUILDING-WINDOWS.md) for Windows prerequisites and a
+smoke-test checklist.
+
 ```bash
 just test        # unit tests
 just check       # formatting, tests, and maintenance checks
