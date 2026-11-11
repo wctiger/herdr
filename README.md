@@ -48,8 +48,9 @@ herdr has no telemetry, so there was none to remove.
   `delivery = "sy-term"` and `[ui.toast.sy-term]`; the herdr spellings still work.
 - The log filter target is the crate name, so verbose logging is
   `HERDR_LOG=sy_term=debug` (upstream used `herdr=debug`).
-- The documents under `docs/` and `README.zh-CN.md` come from upstream herdr.
-  They still describe herdr, including the features removed above.
+- Upstream herdr's website docs, changelog and release tooling are not part of
+  this fork; see the herdr repository for its history. `sy-term --help`,
+  `sy-term --default-config` and `sy-term --skill` describe this build.
 
 ## Build
 
