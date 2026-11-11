@@ -87,7 +87,7 @@ fn agent_version_requirement_only_set_for_kimi() {
 fn enforce_agent_version_warns_when_binary_missing() {
     let requirement = AgentVersionRequirement {
         label: "kimi code",
-        binary: "herdr-test-binary-that-does-not-exist",
+        binary: "sy-term-test-binary-that-does-not-exist",
         args: &["--version"],
         min_version: "0.14.0",
     };
@@ -135,6 +135,7 @@ fn clear_integration_path_env() {
     std::env::remove_var(CODEX_HOME_ENV_VAR);
     std::env::remove_var(COPILOT_HOME_ENV_VAR);
     std::env::remove_var(KIMI_CODE_HOME_ENV_VAR);
+    std::env::remove_var("OPENCODE_CONFIG_DIR");
     std::env::remove_var("XDG_CONFIG_HOME");
     std::env::remove_var("XDG_STATE_HOME");
     #[cfg(windows)]
@@ -182,8 +183,12 @@ fn assert_kimi_hook(
 
 fn unique_base() -> PathBuf {
     clear_integration_path_env();
+    unique_base_without_clearing_env()
+}
+
+fn unique_base_without_clearing_env() -> PathBuf {
     std::env::temp_dir().join(format!(
-        "herdr-integration-install-test-{}-{}",
+        "sy-term-integration-install-test-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -824,7 +829,7 @@ fn outdated_integrations_treat_missing_version_marker_as_legacy() {
     let ext_dir = home.join(".pi/agent/extensions");
     fs::create_dir_all(&ext_dir).unwrap();
     let extension_path = ext_dir.join(PI_EXTENSION_INSTALL_NAME);
-    fs::write(&extension_path, "// installed by herdr\n").unwrap();
+    fs::write(&extension_path, "// installed by sy-term\n").unwrap();
     std::env::set_var("HOME", &home);
 
     let outdated = outdated_installed_integrations();
@@ -1248,7 +1253,7 @@ fn claude_windows_hook_reports_utf8_session_path() {
     let installed = install_claude().unwrap();
 
     let capture = base.join("args.txt");
-    let fake_herdr = base.join("herdr-capture.ps1");
+    let fake_herdr = base.join("sy-term-capture.ps1");
     fs::write(
         &fake_herdr,
         "$capture = $env:HERDR_TEST_CAPTURE\n[System.IO.File]::WriteAllText($capture, ($args -join \"`n\"), [System.Text.UTF8Encoding]::new($false))\n",
@@ -1879,7 +1884,7 @@ fn install_copilot_writes_hook_and_updates_settings() {
         if let Some(entries) = settings["hooks"].get(event) {
             assert!(
                 !entries.to_string().contains(COPILOT_HOOK_INSTALL_NAME),
-                "expected herdr hooks.{event} entries to be removed"
+                "expected sy-term hooks.{event} entries to be removed"
             );
         }
     }
@@ -2456,6 +2461,137 @@ fn install_droid_errors_when_config_dir_missing() {
     let _ = fs::remove_dir_all(base);
 }
 
+struct ConfigPathEnvGuard(Vec<(&'static str, Option<std::ffi::OsString>)>);
+
+impl ConfigPathEnvGuard {
+    fn new() -> Self {
+        Self(
+            [
+                "HOME",
+                "OPENCODE_CONFIG_DIR",
+                "XDG_CONFIG_HOME",
+                "XDG_STATE_HOME",
+            ]
+            .into_iter()
+            .map(|key| (key, std::env::var_os(key)))
+            .collect(),
+        )
+    }
+}
+
+impl Drop for ConfigPathEnvGuard {
+    fn drop(&mut self) {
+        for (key, value) in &self.0 {
+            match value {
+                Some(value) => std::env::set_var(key, value),
+                None => std::env::remove_var(key),
+            }
+        }
+    }
+}
+
+#[test]
+fn config_dirs_follow_xdg_and_opencode_override_precedence() {
+    let _lock = integration_env_lock();
+    let _env = ConfigPathEnvGuard::new();
+    let base = unique_base_without_clearing_env();
+    std::env::remove_var("OPENCODE_CONFIG_DIR");
+    std::env::remove_var("XDG_CONFIG_HOME");
+    let home = base.join("home");
+    let xdg = base.join("xdg");
+    let custom = base.join("custom");
+    std::env::set_var("HOME", &home);
+
+    assert_eq!(opencode_dir().unwrap(), home.join(".config/opencode"));
+    assert_eq!(kilo_dir().unwrap(), home.join(".config/kilo"));
+
+    std::env::set_var("XDG_CONFIG_HOME", "");
+    std::env::set_var("OPENCODE_CONFIG_DIR", "");
+    assert_eq!(opencode_dir().unwrap(), home.join(".config/opencode"));
+    assert_eq!(kilo_dir().unwrap(), home.join(".config/kilo"));
+
+    std::env::set_var("XDG_CONFIG_HOME", &xdg);
+    assert_eq!(opencode_dir().unwrap(), xdg.join("opencode"));
+    assert_eq!(kilo_dir().unwrap(), xdg.join("kilo"));
+
+    std::env::set_var("OPENCODE_CONFIG_DIR", &custom);
+    assert_eq!(opencode_dir().unwrap(), custom);
+    assert_eq!(kilo_dir().unwrap(), xdg.join("kilo"));
+
+    std::env::remove_var("XDG_CONFIG_HOME");
+    assert_eq!(opencode_dir().unwrap(), custom);
+
+    std::env::set_var("OPENCODE_CONFIG_DIR", "~/literal-opencode");
+    assert_eq!(opencode_dir().unwrap(), PathBuf::from("~/literal-opencode"));
+
+    std::env::remove_var("OPENCODE_CONFIG_DIR");
+    std::env::set_var("XDG_CONFIG_HOME", "~/literal-xdg");
+    assert_eq!(
+        opencode_dir().unwrap(),
+        PathBuf::from("~/literal-xdg/opencode")
+    );
+    assert_eq!(kilo_dir().unwrap(), PathBuf::from("~/literal-xdg/kilo"));
+}
+
+#[test]
+fn install_opencode_and_kilo_use_xdg_config_home() {
+    let _lock = integration_env_lock();
+    let _env = ConfigPathEnvGuard::new();
+    let base = unique_base_without_clearing_env();
+    std::env::remove_var("OPENCODE_CONFIG_DIR");
+    let home = base.join("home");
+    let xdg = base.join("xdg");
+    fs::create_dir_all(xdg.join("opencode")).unwrap();
+    fs::create_dir_all(xdg.join("kilo")).unwrap();
+    std::env::set_var("HOME", &home);
+    std::env::set_var("XDG_CONFIG_HOME", &xdg);
+    std::env::set_var("XDG_STATE_HOME", base.join("state"));
+
+    let opencode = install_opencode().unwrap();
+    let kilo = install_kilo().unwrap();
+    assert_eq!(
+        opencode.plugin_path,
+        xdg.join("opencode/plugins")
+            .join(OPENCODE_PLUGIN_INSTALL_NAME)
+    );
+    assert_eq!(
+        kilo.plugin_path,
+        xdg.join("kilo/plugin").join(KILO_PLUGIN_INSTALL_NAME)
+    );
+    assert!(opencode.plugin_path.is_file());
+    assert!(opencode.tui_plugin_path.is_file());
+    assert!(kilo.plugin_path.is_file());
+    assert!(!home.join(".config").exists());
+
+    let statuses = installed_integration_statuses();
+    for (target, path) in [
+        (
+            crate::api::schema::IntegrationTarget::Opencode,
+            &opencode.plugin_path,
+        ),
+        (
+            crate::api::schema::IntegrationTarget::Kilo,
+            &kilo.plugin_path,
+        ),
+    ] {
+        let status = statuses
+            .iter()
+            .find(|status| status.target == target)
+            .unwrap();
+        assert_eq!(&status.path, path);
+        assert_eq!(status.state, IntegrationStatusKind::Current);
+    }
+
+    let removed_opencode = uninstall_opencode().unwrap();
+    let removed_kilo = uninstall_kilo().unwrap();
+    assert_eq!(removed_opencode.plugin_path, opencode.plugin_path);
+    assert_eq!(removed_kilo.plugin_path, kilo.plugin_path);
+    assert!(removed_opencode.removed_plugin);
+    assert!(removed_kilo.removed_plugin);
+
+    let _ = fs::remove_dir_all(base);
+}
+
 #[test]
 fn install_opencode_writes_server_and_tui_plugins() {
     let _lock = integration_env_lock();
@@ -2713,7 +2849,7 @@ fn opencode_recovery_copy_blocks_retry_before_parsing_or_asset_changes() {
     let plugin = dir.join("plugins").join(OPENCODE_PLUGIN_INSTALL_NAME);
     fs::write(&plugin, "previous integration").unwrap();
     let config = dir.join("cli.json");
-    let backup = dir.join("cli.json.herdr-backup");
+    let backup = dir.join("cli.json.sy-term-backup");
     let original = r#"{"plugins":["./herdr-opencode"],"theme":"system"}"#;
     fs::write(&backup, original).unwrap();
     let target = crate::api::schema::IntegrationTarget::Opencode;
@@ -2728,7 +2864,7 @@ fn opencode_recovery_copy_blocks_retry_before_parsing_or_asset_changes() {
             uninstall_target(target).unwrap_err(),
         ] {
             assert!(error.to_string().contains("recovery copy"), "{error}");
-            assert!(error.to_string().contains("cli.json.herdr-backup"));
+            assert!(error.to_string().contains("cli.json.sy-term-backup"));
         }
         assert_eq!(fs::read_to_string(&backup).unwrap(), original);
         if contents.is_none() {
@@ -2738,12 +2874,14 @@ fn opencode_recovery_copy_blocks_retry_before_parsing_or_asset_changes() {
     // A symlink invocation must discover the referent's recovery copy too.
     let referent = base.join("preferences.json");
     fs::write(&referent, "{").unwrap();
-    let linked_backup = base.join("preferences.json.herdr-backup");
+    let linked_backup = base.join("preferences.json.sy-term-backup");
     fs::rename(&backup, &linked_backup).unwrap();
     if symlink_file(&referent, &config) {
         let link_before = fs::read_link(&config).unwrap();
         let error = install_target(target).unwrap_err();
-        assert!(error.to_string().contains("preferences.json.herdr-backup"));
+        assert!(error
+            .to_string()
+            .contains("preferences.json.sy-term-backup"));
         assert_eq!(fs::read_link(&config).unwrap(), link_before);
     }
     assert_eq!(fs::read_to_string(&plugin).unwrap(), "previous integration");
@@ -3413,7 +3551,7 @@ fn install_hermes_is_idempotent_for_quoted_flat_plugin_entry() {
     fs::create_dir_all(&hermes_dir).unwrap();
     fs::write(
         hermes_dir.join("config.yaml"),
-        "plugins:\n  - \"herdr-agent-state\" # installed by herdr\n",
+        "plugins:\n  - \"herdr-agent-state\" # installed by sy-term\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -3423,7 +3561,7 @@ fn install_hermes_is_idempotent_for_quoted_flat_plugin_entry() {
     let config = fs::read_to_string(hermes_dir.join("config.yaml")).unwrap();
     assert_eq!(
         config,
-        "plugins:\n  - \"herdr-agent-state\" # installed by herdr\n"
+        "plugins:\n  - \"herdr-agent-state\" # installed by sy-term\n"
     );
 
     std::env::remove_var("HOME");
@@ -3564,7 +3702,7 @@ fn uninstall_hermes_removes_commented_flat_plugin_entry() {
     .unwrap();
     fs::write(
         hermes_dir.join("config.yaml"),
-        "plugins:\n  - other-plugin\n  - herdr-agent-state # installed by herdr\n",
+        "plugins:\n  - other-plugin\n  - herdr-agent-state # installed by sy-term\n",
     )
     .unwrap();
     std::env::set_var("HOME", &home);
@@ -4140,7 +4278,7 @@ fn letta_session_hook_is_silent_and_encodes_default_conversation() {
     let installed = install_letta().unwrap();
 
     let capture = base.join("args.txt");
-    let fake_herdr = base.join("herdr");
+    let fake_herdr = base.join("sy-term");
     fs::write(
         &fake_herdr,
         format!(
@@ -4158,7 +4296,7 @@ fn letta_session_hook_is_silent_and_encodes_default_conversation() {
         .arg("session")
         .env("HERDR_ENV", "1")
         .env("HERDR_PANE_ID", "w1:p2")
-        .env("HERDR_SOCKET_PATH", "/tmp/herdr.sock")
+        .env("HERDR_SOCKET_PATH", "/tmp/sy-term.sock")
         .env("HERDR_BIN_PATH", &fake_herdr)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -4454,7 +4592,7 @@ fn install_mastracode_writes_hook_and_updates_hooks_json() {
     let hooks = hooks_file.as_object().unwrap();
     for (event, action) in MASTRACODE_HOOK_EVENTS {
         let entries = hooks.get(event).and_then(Value::as_array).unwrap();
-        assert_eq!(entries.len(), 1, "{event} should have one Herdr hook");
+        assert_eq!(entries.len(), 1, "{event} should have one sy-term hook");
         let command = entries[0].get("command").and_then(Value::as_str).unwrap();
         assert_eq!(
             command,
@@ -4839,7 +4977,7 @@ fn install_antigravity_cli_writes_hook_and_updates_hooks_json() {
 
     for (event, action) in ANTIGRAVITY_CLI_HOOK_EVENTS {
         let entries = block.get(event).and_then(Value::as_array).unwrap();
-        assert_eq!(entries.len(), 1, "{event} should hold one Herdr entry");
+        assert_eq!(entries.len(), 1, "{event} should hold one sy-term entry");
         let handler = &entries[0];
 
         // Handlers must be a flat list; the matcher/hooks wrapper is only
@@ -4931,7 +5069,7 @@ fn install_antigravity_cli_rewrites_stale_herdr_block() {
     // matcher/hooks, and left entries Antigravity CLI now rejects.
     fs::write(
         agy_dir.join("hooks.json"),
-        r#"{"herdr":{"Stop":[{"matcher":"*","hooks":[{"type":"command","command":"stale"}]}],"PostInvocation":[{"type":"command","command":"stale idle"}],"Legacy":[]}}"#,
+        r#"{"sy-term":{"Stop":[{"matcher":"*","hooks":[{"type":"command","command":"stale"}]}],"PostInvocation":[{"type":"command","command":"stale idle"}],"Legacy":[]}}"#,
     )
     .unwrap();
     std::env::set_var(ANTIGRAVITY_CLI_CONFIG_DIR_ENV_VAR, &agy_dir);

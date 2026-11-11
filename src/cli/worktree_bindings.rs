@@ -155,20 +155,6 @@ mod tests {
                 "id":"cli:worktree:open", "method":"worktree.open", "params":{"path":expected, "focus":false}
             })
         );
-        crate::cli::target::with_test_client(crate::api::client::ApiClient::local(), || {
-            assert_eq!(
-                serde_json::to_value(
-                    parse(&["create", "--cwd", "~/repo", "--path", "/remote/new"]).unwrap()
-                )
-                .unwrap(),
-                serde_json::json!({
-                    "id":"cli:worktree:create", "method":"worktree.create", "params":{"cwd":"~/repo", "path":"/remote/new", "focus":false}
-                })
-            );
-            assert!(
-                matches!(parse(&["open", "--path", "relative"]), Err(ParseError::Io(error)) if error.kind() == std::io::ErrorKind::InvalidInput && error.to_string() == "remote worktree paths must be absolute or start with ~/")
-            );
-        });
     }
 
     #[test]

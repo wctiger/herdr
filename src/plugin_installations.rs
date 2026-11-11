@@ -9,16 +9,6 @@ use crate::api::schema::InstalledPluginInfo;
 const LEASE_FILE: &str = ".in-use";
 pub(crate) type Leases = HashMap<PathBuf, Arc<File>>;
 
-pub(crate) fn create_lease(installation: &Path) -> io::Result<File> {
-    let file = OpenOptions::new()
-        .create_new(true)
-        .read(true)
-        .write(true)
-        .open(installation.join(LEASE_FILE))?;
-    file.lock_shared()?;
-    Ok(file)
-}
-
 fn lease_path(path: &Path) -> Option<PathBuf> {
     let root = crate::plugin_paths::managed_plugins_dir()
         .join("github-installations")
@@ -236,6 +226,17 @@ pub(crate) fn cleanup() -> io::Result<()> {
         }
         errors.into_iter().next().map_or(Ok(()), Err)
     })
+}
+
+#[cfg(test)]
+pub(crate) fn create_lease(installation: &Path) -> io::Result<File> {
+    let file = OpenOptions::new()
+        .create_new(true)
+        .read(true)
+        .write(true)
+        .open(installation.join(LEASE_FILE))?;
+    file.lock_shared()?;
+    Ok(file)
 }
 
 #[cfg(test)]

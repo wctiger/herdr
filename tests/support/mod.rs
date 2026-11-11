@@ -14,7 +14,7 @@ static RUNTIME_DIR_REGISTRY: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new()
 static INIT: Once = Once::new();
 static CLEANUP_GUARD: OnceLock<CleanupGuard> = OnceLock::new();
 const WATCHDOG_SCAN_INTERVAL: Duration = Duration::from_secs(1);
-const RUNTIME_OWNER_MARKER: &str = ".herdr-test-owner-pid";
+const RUNTIME_OWNER_MARKER: &str = ".sy-term-test-owner-pid";
 pub const CURRENT_PROTOCOL: u32 = 22;
 pub const CURRENT_ENDPOINT_PROTOCOL_GENERATION: u32 = 1;
 pub const SERVER_MESSAGE_SERVER_SHUTDOWN: u32 = 3;
@@ -631,7 +631,7 @@ fn start_global_watchdog() {
         thread::sleep(WATCHDOG_SCAN_INTERVAL);
 
         if let Err(err) = cleanup_servers_with_missing_runtime_dir() {
-            eprintln!("herdr test cleanup watchdog error: {err}");
+            eprintln!("sy-term test cleanup watchdog error: {err}");
         }
     });
 }
@@ -778,7 +778,7 @@ fn is_test_herdr_binary(path: &Path) -> bool {
     // custom target directories; binary identity alone never grants ownership.
     static TEST_BINARY: OnceLock<Option<PathBuf>> = OnceLock::new();
     TEST_BINARY
-        .get_or_init(|| fs::canonicalize(env!("CARGO_BIN_EXE_herdr")).ok())
+        .get_or_init(|| fs::canonicalize(env!("CARGO_BIN_EXE_sy-term")).ok())
         .as_deref()
         .is_some_and(|binary| path == binary)
 }
@@ -874,7 +874,7 @@ mod tests {
             .unwrap_or_default()
             .as_nanos();
         std::env::temp_dir().join(format!(
-            "herdr-watchdog-scoping-{label}-{}-{unique}",
+            "syt-watchdog-scoping-{label}-{}-{unique}",
             std::process::id()
         ))
     }
@@ -919,7 +919,7 @@ mod tests {
 
     #[test]
     fn test_binary_matcher_accepts_cargo_test_binary() {
-        let binary = std::fs::canonicalize(env!("CARGO_BIN_EXE_herdr"))
+        let binary = std::fs::canonicalize(env!("CARGO_BIN_EXE_sy-term"))
             .expect("Cargo-built binary must exist");
         assert!(
             is_test_herdr_binary(&binary),
@@ -929,14 +929,14 @@ mod tests {
 
     #[test]
     fn test_binary_matcher_rejects_other_binaries() {
-        let nested_build = Path::new(env!("CARGO_MANIFEST_DIR")).join("other/target/debug/herdr");
-        let sibling_build = Path::new(env!("CARGO_BIN_EXE_herdr"))
+        let nested_build = Path::new(env!("CARGO_MANIFEST_DIR")).join("other/target/debug/sy-term");
+        let sibling_build = Path::new(env!("CARGO_BIN_EXE_sy-term"))
             .parent()
             .unwrap()
-            .join("other-build/herdr");
+            .join("other-build/sy-term");
         for binary in [
-            Path::new("/home/can/.local/bin/herdr"),
-            Path::new("/tmp/other-checkout/target/debug/herdr"),
+            Path::new("/home/can/.local/bin/sy-term"),
+            Path::new("/tmp/other-checkout/target/debug/sy-term"),
             nested_build.as_path(),
             sibling_build.as_path(),
         ] {

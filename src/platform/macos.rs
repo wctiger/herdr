@@ -7,20 +7,15 @@ use std::process::{Command, Stdio};
 use std::ptr::NonNull;
 use std::sync::OnceLock;
 
-pub(super) const REMOTE_BRIDGE_CLOCK: libc::clockid_t = libc::CLOCK_MONOTONIC;
-
 use super::{
     read_limited_reader, ClipboardCommand, ClipboardImage, ForegroundJob, ForegroundProcess,
     LimitedRead, Signal,
 };
 
 pub(crate) use super::unix_common::{
-    configure_status_command, create_remote_private_dir, create_remote_ssh_config_dir,
-    create_remote_ssh_config_file, hostname, local_datetime, remote_bridge_endpoint_path,
-    remote_private_temp_base, remote_reattach_argument, remote_reattach_program,
-    remote_ssh_config_paths, set_default_plugin_pane_pwd, shutdown_client_stream,
-    status_commands_supported, wait_client_stream_readable, write_client_stream,
-    ClientStreamReader, PinnedSshControlSocket, StatusCommandGuard,
+    configure_status_command, hostname, local_datetime, set_default_plugin_pane_pwd,
+    shutdown_client_stream, status_commands_supported, wait_client_stream_readable,
+    write_client_stream, ClientStreamReader, StatusCommandGuard,
 };
 
 mod bootstrap;
@@ -702,7 +697,7 @@ pub fn open_url(url: &str) -> std::io::Result<Option<std::process::Child>> {
 
 pub fn read_clipboard_image() -> Option<ClipboardImage> {
     let path = std::env::temp_dir().join(format!(
-        "herdr-clipboard-image-{}-{}.png",
+        "sy-term-clipboard-image-{}-{}.png",
         std::process::id(),
         unique_timestamp_nanos()
     ));
@@ -1356,10 +1351,8 @@ mod tests {
 
     #[test]
     fn terminal_notifier_success_skips_osascript() {
-        let path = std::env::temp_dir().join(format!(
-            "herdr-terminal-notifier-args-{}",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("syt-terminal-notifier-args-{}", std::process::id()));
         let script = "printf '%s:%s\\n' \"$0\" \"$*\" >> \"$HERDR_NOTIFY_ARGS\"";
         let mut command = |program: &str| {
             let mut cmd = Command::new("sh");
@@ -1388,8 +1381,7 @@ mod tests {
 
     #[test]
     fn desktop_notification_falls_back_to_osascript_when_terminal_notifier_fails() {
-        let path =
-            std::env::temp_dir().join(format!("herdr-osascript-args-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("syt-osascript-args-{}", std::process::id()));
         let script = r#"
 if [ "$0" = "terminal-notifier" ]; then
   exit 1
@@ -1418,12 +1410,12 @@ printf '%s\n' "$@" > "$HERDR_NOTIFY_ARGS"
 
     #[test]
     fn scrollback_editor_argv_preserves_unix_editor_shell_semantics() {
-        let path = std::path::Path::new("/tmp/herdr scrollback.txt");
+        let path = std::path::Path::new("/tmp/sy-term scrollback.txt");
         let argv = scrollback_editor_argv(path).unwrap();
 
         assert_eq!(argv[0], "/bin/sh");
         assert_eq!(argv[1], "-c");
         assert!(argv[2].contains("EDITOR:-vi"));
-        assert!(argv[2].contains("/tmp/herdr scrollback.txt"));
+        assert!(argv[2].contains("/tmp/sy-term scrollback.txt"));
     }
 }

@@ -104,7 +104,7 @@ fn apply_pane_terminal_env(cmd: &mut CommandBuilder) {
     // when the remote side lacks matching terminfo entries.
     cmd.env("TERM", PANE_TERM);
     cmd.env("COLORTERM", PANE_COLORTERM);
-    cmd.env("TERM_PROGRAM", "herdr");
+    cmd.env("TERM_PROGRAM", "sy-term");
     cmd.env("TERM_PROGRAM_VERSION", crate::build_info::version());
     // fish only skips its own resize repaint for terminals it recognizes as
     // reflowing. Herdr reflows too, and the competing repaint glues prompt copies.
@@ -4019,16 +4019,17 @@ impl PaneRuntime {
         (release_tx, writer)
     }
 
-    pub(crate) fn test_process_pty_bytes(&self, bytes: &[u8]) {
+    pub(crate) fn test_process_pty_bytes(&self, bytes: &[u8]) -> Vec<Bytes> {
         let _content_write_guard = match self.content_write_lock.lock() {
             Ok(guard) => guard,
             Err(poisoned) => poisoned.into_inner(),
         };
         self.content_seq.fetch_add(1, Ordering::AcqRel);
         let (tx, _rx) = mpsc::channel(1);
-        let _ = self.terminal.process_pty_bytes(self.pane_id, 0, bytes, &tx);
+        let result = self.terminal.process_pty_bytes(self.pane_id, 0, bytes, &tx);
         self.content_seq.fetch_add(1, Ordering::Release);
         self.compression.wake();
+        result.terminal_responses
     }
 
     pub(crate) fn test_with_scrollback_bytes(
@@ -4394,7 +4395,7 @@ mod tests {
         for key in keys {
             assert!(cmd.get_env(key).is_none(), "{key} must not leak into panes");
         }
-        assert_eq!(cmd.get_env("TERM_PROGRAM"), Some(OsStr::new("herdr")));
+        assert_eq!(cmd.get_env("TERM_PROGRAM"), Some(OsStr::new("sy-term")));
         assert_eq!(
             cmd.get_env("TERM_PROGRAM_VERSION"),
             Some(OsStr::new(&crate::build_info::version()))
@@ -4474,7 +4475,7 @@ mod tests {
             .expect("clock should be after unix epoch")
             .as_nanos();
         let cwd = std::env::temp_dir().join(format!(
-            "herdr-reported-cwd-cache-{}-{stamp}",
+            "syt-reported-cwd-cache-{}-{stamp}",
             std::process::id()
         ));
         std::fs::create_dir(&cwd).expect("create reported cwd");
@@ -4503,7 +4504,7 @@ mod tests {
             .expect("clock should be after unix epoch")
             .as_nanos();
         let base = std::env::temp_dir().join(format!(
-            "herdr-process-cwd-no-stat-{}-{stamp}",
+            "syt-process-cwd-no-stat-{}-{stamp}",
             std::process::id()
         ));
         let private = base.join("private");
@@ -4579,7 +4580,7 @@ mod tests {
             })
             .unwrap();
         let output_path = std::env::temp_dir().join(format!(
-            "herdr-pane-term-test-{}-{}.txt",
+            "syt-pane-term-test-{}-{}.txt",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -4675,7 +4676,7 @@ mod tests {
     #[test]
     fn windows_default_pane_shell_prefers_pwsh_on_path() {
         let dir = std::env::temp_dir().join(format!(
-            "herdr-windows-default-shell-pwsh-{}",
+            "syt-windows-default-shell-pwsh-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
@@ -4694,7 +4695,7 @@ mod tests {
     #[test]
     fn windows_default_pane_shell_falls_back_to_inbox_powershell() {
         let dir = std::env::temp_dir().join(format!(
-            "herdr-windows-default-shell-fallback-{}",
+            "syt-windows-default-shell-fallback-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
@@ -4712,7 +4713,7 @@ mod tests {
     #[test]
     fn windows_default_pane_shell_rejects_non_executable_pe_images() {
         let dir = std::env::temp_dir().join(format!(
-            "herdr-windows-default-shell-invalid-{}",
+            "syt-windows-default-shell-invalid-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
@@ -4793,7 +4794,7 @@ mod tests {
     #[test]
     fn windows_executable_file_rejects_arm64_image_on_amd64_host() {
         let dir = std::env::temp_dir().join(format!(
-            "herdr-windows-default-shell-arm64-{}",
+            "syt-windows-default-shell-arm64-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
@@ -4813,7 +4814,7 @@ mod tests {
     #[test]
     fn windows_default_pane_shell_skips_invalid_pwsh_candidates() {
         let base = std::env::temp_dir().join(format!(
-            "herdr-windows-default-shell-skip-{}",
+            "syt-windows-default-shell-skip-{}",
             std::process::id()
         ));
         let invalid_dir = base.join("invalid");
@@ -5145,7 +5146,7 @@ mod tests {
     fn login_shell_builder_resolves_bare_shell_names_from_path() {
         let _lock = crate::integration::integration_env_lock();
         let base = std::env::temp_dir().join(format!(
-            "herdr-login-shell-path-{}-{}",
+            "syt-login-shell-path-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -6592,7 +6593,7 @@ mod tests {
     #[tokio::test]
     async fn spawned_pane_process_sees_fish_handle_reflow() {
         let output_dir = std::env::temp_dir().join(format!(
-            "herdr-fish-handle-reflow-test-{}-{}",
+            "syt-fish-handle-reflow-test-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -6684,9 +6685,10 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(1);
         let pane_id = PaneId::from_raw(42);
 
-        tx.try_send(AppEvent::UpdateReady {
-            version: "9.9.9".into(),
-            install_command: "herdr update".into(),
+        tx.try_send(AppEvent::HookAuthorityCleared {
+            pane_id: crate::layout::PaneId::from_raw(u32::MAX),
+            source: None,
+            seq: None,
         })
         .unwrap();
 
@@ -6715,7 +6717,7 @@ mod tests {
             .await
             .expect("queue should yield first event")
             .expect("sender still alive");
-        assert!(matches!(first, AppEvent::UpdateReady { .. }));
+        assert!(matches!(first, AppEvent::HookAuthorityCleared { .. }));
 
         tokio::time::timeout(std::time::Duration::from_millis(50), async {
             (&mut publish).await;

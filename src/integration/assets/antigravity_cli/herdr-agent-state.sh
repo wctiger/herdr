@@ -1,12 +1,12 @@
 #!/bin/sh
-# installed by herdr
-# managed by herdr; reinstalling or updating the integration overwrites this file.
+# installed by sy-term
+# managed by sy-term; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=antigravity_cli
 # HERDR_INTEGRATION_VERSION=4
 
-# Session-only: this hook reports the Antigravity conversation so Herdr can
-# resume the pane. Lifecycle state comes from Herdr's screen detection.
+# Session-only: this hook reports the Antigravity conversation so sy-term can
+# resume the pane. Lifecycle state comes from sy-term's screen detection.
 
 set -eu
 

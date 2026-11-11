@@ -206,17 +206,14 @@ fn client_mouse_selection_highlights_and_copies_through_endpoint_extraction() {
             text: "LIV".into(),
         }),
     );
-    assert!(repaint);
+    assert!(!repaint);
     assert!(matches!(
         &actions[..],
         [ClientShellAction::ClipboardWrite(bytes)] if bytes == b"LIV"
     ));
-    assert_eq!(
-        state
-            .copy_feedback
-            .as_ref()
-            .map(|feedback| feedback.message.as_str()),
-        Some("copied to clipboard")
+    assert!(
+        state.copy_feedback.is_none(),
+        "feedback must wait for clipboard dispatch"
     );
 }
 
@@ -1609,65 +1606,6 @@ fn navigator_scale_snapshot(workspaces: usize, tabs: usize, panes: usize) -> Cli
     result.focused_tab_id = Some(result.tabs[0].tab_id.clone());
     result.focused_pane_id = Some(result.panes[0].pane_id.clone());
     result
-}
-
-#[test]
-fn navigator_grouping_keeps_snapshot_order_with_interleaved_tabs_and_panes() {
-    let mut snapshot = navigator_scale_snapshot(2, 2, 2);
-    snapshot.tabs.swap(1, 2);
-    snapshot.panes.reverse();
-    let expected = snapshot
-        .workspaces
-        .iter()
-        .flat_map(|workspace| {
-            snapshot
-                .tabs
-                .iter()
-                .filter(|tab| tab.workspace_id == workspace.workspace_id)
-                .flat_map(|tab| {
-                    snapshot
-                        .panes
-                        .iter()
-                        .filter(|pane| pane.tab_id == tab.tab_id)
-                        .map(|pane| pane.pane_id.clone())
-                })
-        })
-        .collect::<Vec<_>>();
-    let mut state = ClientShellState::new(ClientShellConfig::from_config(&Config::default()));
-    let remote = SavedSshEndpoint::new("Remote", "dev@example.invalid", "test").unwrap();
-    let remote_id = ClientEndpointId::Ssh(remote.id.clone());
-    state.set_endpoint_catalog(&[remote]);
-    state.set_endpoint_status(&remote_id, ClientEndpointStatus::Online);
-    state.set_endpoint_snapshot(&remote_id, Box::new(snapshot.clone()));
-    state.set_snapshot(Box::new(snapshot));
-    state.open_navigator_overlay();
-    let Some(ClientShellOverlay::Navigator(navigator)) = state.overlay.as_ref() else {
-        panic!("navigator")
-    };
-    let rows =
-        render::client_navigator_rows(&state.endpoints, &state.active_endpoint_id, navigator);
-    let actual = rows
-        .iter()
-        .filter_map(|row| match &row.target {
-            ClientNavigatorTarget::Pane {
-                endpoint_id,
-                pane_id,
-            } => {
-                assert!(endpoint_id == &state.active_endpoint_id || endpoint_id == &remote_id);
-                Some((endpoint_id.clone(), pane_id.clone()))
-            }
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    let expected = [state.active_endpoint_id.clone(), remote_id]
-        .into_iter()
-        .flat_map(|endpoint| {
-            expected
-                .iter()
-                .map(move |pane| (endpoint.clone(), pane.clone()))
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(actual, expected);
 }
 
 #[test]

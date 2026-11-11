@@ -132,7 +132,7 @@ fn named_sessions_use_separate_servers_and_workspace_state() {
     assert!(alpha_session["socket_path"]
         .as_str()
         .unwrap()
-        .ends_with("/sessions/alpha/herdr.sock"));
+        .ends_with("/sessions/alpha/sy-term.sock"));
     assert!(beta_session["session_dir"]
         .as_str()
         .unwrap()
@@ -210,7 +210,7 @@ fn dead_server_cli_reports_one_session_aware_json_line() {
         assert_eq!(
             response["error"]["message"],
             format!(
-                "no herdr server is running at {}; run `{attach_command}` to start or attach it",
+                "no sy-term server is running at {}; run `{attach_command}` to start or attach it",
                 socket_path.display()
             )
         );
@@ -228,11 +228,11 @@ fn dead_server_cli_reports_one_session_aware_json_line() {
         &runtime_dir,
         &["--session", "foo", "workspace", "create"],
     );
-    assert_server_not_running(missing, &named_socket, "herdr session attach foo");
+    assert_server_not_running(missing, &named_socket, "sy-term session attach foo");
 
     let stale_socket = runtime_dir.join("stale.sock");
     drop(UnixListener::bind(&stale_socket).unwrap());
-    let stale = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let stale = Command::new(env!("CARGO_BIN_EXE_sy-term"))
         .args(["workspace", "create"])
         .env("XDG_CONFIG_HOME", &config_home)
         .env("XDG_RUNTIME_DIR", &runtime_dir)
@@ -242,7 +242,7 @@ fn dead_server_cli_reports_one_session_aware_json_line() {
         .env_remove("HERDR_ENV")
         .output()
         .unwrap();
-    assert_server_not_running(stale, &stale_socket, "herdr");
+    assert_server_not_running(stale, &stale_socket, "sy-term");
 
     cleanup_test_base(&base);
 }
@@ -265,7 +265,7 @@ fn integration_commands_run_locally_when_server_is_missing() {
         "test setup should start without extension file"
     );
 
-    let workspace_list = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let workspace_list = Command::new(env!("CARGO_BIN_EXE_sy-term"))
         .args(["workspace", "list"])
         .env("HERDR_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
@@ -273,7 +273,7 @@ fn integration_commands_run_locally_when_server_is_missing() {
         .unwrap();
     assert_eq!(workspace_list.status.code(), Some(1));
 
-    let integration_install = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let integration_install = Command::new(env!("CARGO_BIN_EXE_sy-term"))
         .args(["integration", "install", "pi"])
         .env("HERDR_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
@@ -285,7 +285,7 @@ fn integration_commands_run_locally_when_server_is_missing() {
         "integration install should write local files without a server"
     );
 
-    let integration_status = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let integration_status = Command::new(env!("CARGO_BIN_EXE_sy-term"))
         .args(["integration", "status"])
         .env("HERDR_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
@@ -296,7 +296,7 @@ fn integration_commands_run_locally_when_server_is_missing() {
     assert!(status_stdout.contains("pi: current (v9)"));
     assert!(status_stdout.contains("claude: not installed"));
 
-    let integration_uninstall = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let integration_uninstall = Command::new(env!("CARGO_BIN_EXE_sy-term"))
         .args(["integration", "uninstall", "pi"])
         .env("HERDR_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
@@ -319,7 +319,7 @@ fn integration_status_outdated_only_prints_action_for_legacy_install() {
     fs::create_dir_all(&extensions_dir).unwrap();
     fs::write(
         extensions_dir.join("herdr-agent-state.ts"),
-        "// legacy herdr integration\n",
+        "// legacy sy-term integration\n",
     )
     .unwrap();
 
@@ -328,7 +328,7 @@ fn integration_status_outdated_only_prints_action_for_legacy_install() {
     register_runtime_dir(&runtime_dir);
     let missing_socket = runtime_dir.join("missing.sock");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_sy-term"))
         .args(["integration", "status", "--outdated-only"])
         .env("HERDR_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
@@ -338,8 +338,8 @@ fn integration_status_outdated_only_prints_action_for_legacy_install() {
     assert_eq!(output.status.code(), Some(0));
     assert!(output.stdout.is_empty());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("installed herdr integrations need updating"));
-    assert!(stderr.contains("herdr integration install pi"));
+    assert!(stderr.contains("installed sy-term integrations need updating"));
+    assert!(stderr.contains("sy-term integration install pi"));
 
     cleanup_test_base(&base);
 }
@@ -354,7 +354,7 @@ fn integration_status_rejects_unknown_flags() {
     register_runtime_dir(&runtime_dir);
     let missing_socket = runtime_dir.join("missing.sock");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = Command::new(env!("CARGO_BIN_EXE_sy-term"))
         .args(["integration", "status", "--wat"])
         .env("HERDR_SOCKET_PATH", &missing_socket)
         .env("HOME", &home_dir)
@@ -371,7 +371,7 @@ fn status_commands_report_client_and_server_versions() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -458,7 +458,6 @@ fn status_commands_report_client_and_server_versions() {
     assert_eq!(full_json["client"]["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(full_json["client"]["protocol"], 22);
     assert_eq!(full_json["client"]["endpoint_protocol_generation"], 1);
-    assert_eq!(full_json["client"]["remote_host_bridge"], true);
     assert_eq!(full_json["server"]["status"], "running");
     assert_eq!(full_json["server"]["running"], true);
     assert_eq!(full_json["server"]["compatible"], true);
@@ -483,7 +482,6 @@ fn status_commands_report_client_and_server_versions() {
     assert_eq!(client_json["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(client_json["protocol"], 22);
     assert_eq!(client_json["endpoint_protocol_generation"], 1);
-    assert_eq!(client_json["remote_host_bridge"], true);
     assert!(client_json["binary"]
         .as_str()
         .is_some_and(|path| !path.is_empty()));
@@ -533,8 +531,8 @@ fn server_stop_command_shuts_down_running_server() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let mut herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -573,8 +571,8 @@ fn server_stop_then_restart_restores_pane_history() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
     let marker = "PERSISTED_HISTORY_AFTER_STOP";
 
     let mut herdr = spawn_herdr_with_pane_history(&config_home, &runtime_dir, &socket_path);
@@ -665,7 +663,7 @@ fn unloaded_session_survives_autosave_and_shutdown_when_recovery_is_blocked() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
     let data_dir = config_home.join(app_dir_name());
     fs::create_dir_all(&data_dir).unwrap();
     let session_path = data_dir.join("session.json");
@@ -683,7 +681,7 @@ fn unloaded_session_survives_autosave_and_shutdown_when_recovery_is_blocked() {
         Duration::from_secs(10),
         Duration::from_millis(25),
         || {
-            fs::read_to_string(data_dir.join("herdr-server.log"))
+            fs::read_to_string(data_dir.join("sy-term-server.log"))
                 .is_ok_and(|log| log.contains("event=\"persist.save\""))
         }
     ));
@@ -702,7 +700,7 @@ fn session_appearing_after_startup_is_preserved_before_autosave() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
     let data_dir = config_home.join(app_dir_name());
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -720,7 +718,7 @@ fn session_appearing_after_startup_is_preserved_before_autosave() {
         Duration::from_secs(10),
         Duration::from_millis(25),
         || {
-            fs::read_to_string(data_dir.join("herdr-server.log"))
+            fs::read_to_string(data_dir.join("sy-term-server.log"))
                 .is_ok_and(|log| log.contains("event=\"persist.save\""))
         }
     ));
@@ -737,11 +735,11 @@ fn server_start_restores_legacy_session_through_api_identity() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
     let data_dir = config_home.join(app_dir_name());
     let pion_cwd = base.join("legacy-pion");
-    let herdr_cwd = base.join("legacy-herdr");
+    let herdr_cwd = base.join("legacy-sy-term");
 
     fs::create_dir_all(&pion_cwd).unwrap();
     fs::create_dir_all(&herdr_cwd).unwrap();

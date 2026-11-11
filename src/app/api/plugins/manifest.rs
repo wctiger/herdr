@@ -236,7 +236,7 @@ fn validate_min_herdr_version(value: Option<&str>) -> Result<String, (&'static s
         "invalid_plugin_min_herdr_version",
         "plugin min_herdr_version is required",
     )?;
-    let required = crate::update::Version::parse(&value).ok_or_else(|| {
+    let required = crate::version::Version::parse(&value).ok_or_else(|| {
         (
             "invalid_plugin_min_herdr_version",
             format!(
@@ -245,11 +245,11 @@ fn validate_min_herdr_version(value: Option<&str>) -> Result<String, (&'static s
             ),
         )
     })?;
-    let current = crate::update::Version::current();
+    let current = crate::version::Version::current();
     if required > current {
         return Err((
             "plugin_requires_newer_herdr",
-            format!("plugin requires Herdr {required} or newer; current Herdr is {current}"),
+            format!("plugin requires sy-term {required} or newer; current sy-term is {current}"),
         ));
     }
     Ok(required.to_string())

@@ -25,7 +25,7 @@ fn unique_test_dir() -> PathBuf {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     PathBuf::from(format!(
-        "/tmp/herdr-server-test-{}-{nanos}",
+        "/tmp/syt-server-test-{}-{nanos}",
         std::process::id()
     ))
 }
@@ -104,11 +104,11 @@ fn spawn_server(
     api_socket_path: &Path,
     _client_socket_path: &Path,
 ) -> SpawnedHerdr {
-    fs::create_dir_all(config_home.join("herdr")).unwrap();
+    fs::create_dir_all(config_home.join("sy-term")).unwrap();
     fs::create_dir_all(runtime_dir).unwrap();
     register_runtime_dir(runtime_dir);
     fs::write(
-        config_home.join("herdr/config.toml"),
+        config_home.join("sy-term/config.toml"),
         "onboarding = false\n",
     )
     .unwrap();
@@ -122,7 +122,7 @@ fn spawn_server(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_sy-term"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
@@ -164,8 +164,8 @@ fn server_creates_both_sockets() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
 
@@ -197,8 +197,8 @@ fn server_starts_without_terminal() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
 
@@ -220,8 +220,8 @@ fn server_api_responds_to_ping() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -242,8 +242,8 @@ fn server_removes_client_socket_on_exit() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let mut spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -276,8 +276,8 @@ fn server_cleans_up_stale_client_socket() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     // Create a stale client socket file (simulating a crashed server).
     fs::create_dir_all(&runtime_dir).unwrap();
@@ -307,8 +307,8 @@ fn server_persists_after_client_disconnect() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -339,8 +339,8 @@ fn duplicate_server_start_fails_gracefully() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     // Start the first server.
     let spawned1 = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
@@ -356,7 +356,7 @@ fn duplicate_server_start_fails_gracefully() {
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_sy-term"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", &config_home);
@@ -386,8 +386,8 @@ fn client_handshake_succeeds() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -419,8 +419,8 @@ fn client_handshake_rejects_incompatible_version() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -450,8 +450,8 @@ fn client_handshake_clamps_small_terminal_size() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -482,8 +482,8 @@ fn no_hello_client_closed_within_five_seconds() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -540,11 +540,11 @@ fn no_hello_client_closed_within_five_seconds() {
 
 fn server_log_path(config_home: &Path) -> PathBuf {
     let app_dir_name = if cfg!(debug_assertions) {
-        "herdr-dev"
+        "sy-term-dev"
     } else {
-        "herdr"
+        "sy-term"
     };
-    config_home.join(app_dir_name).join("herdr-server.log")
+    config_home.join(app_dir_name).join("sy-term-server.log")
 }
 
 fn wait_for_exit(child: &mut Box<dyn Child + Send + Sync>, timeout: Duration) -> bool {
@@ -580,8 +580,8 @@ fn server_survives_hangup_and_logs_why_it_stops() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let mut spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -595,6 +595,15 @@ fn server_survives_hangup_and_logs_why_it_stops() {
         "server must not stop on SIGHUP"
     );
     assert!(ping_socket(&api_socket).contains("pong"));
+
+    // API ping works before the main loop installs its signal handlers.
+    wait_for_file(&client_socket, Duration::from_secs(10));
+    let mut client = UnixStream::connect(&client_socket).expect("connect to ready server");
+    let (version, error) = client_handshake(&mut client, CURRENT_PROTOCOL, 80, 24)
+        .expect("server event loop must be ready before SIGTERM");
+    assert_eq!(version, CURRENT_PROTOCOL);
+    assert!(error.is_none());
+    drop(client);
 
     assert_eq!(unsafe { libc::kill(pid, libc::SIGTERM) }, 0);
     assert!(
@@ -617,8 +626,8 @@ fn server_stop_request_logs_its_caller() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let mut spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));

@@ -113,29 +113,6 @@ impl ClientShellState {
         self.reconcile_input_source();
     }
 
-    pub(crate) fn retire_endpoint(&mut self, endpoint_id: &ClientEndpointId) {
-        self.clear_machine_diagnostic(endpoint_id);
-        if endpoint_id == &self.active_endpoint_id {
-            self.pending_workspace_highlight = None;
-        }
-        self.retire_endpoint_notifications(endpoint_id);
-        if let Some(endpoint) = self
-            .endpoints
-            .iter_mut()
-            .find(|endpoint| &endpoint.endpoint_id == endpoint_id)
-        {
-            endpoint.status = ClientEndpointStatus::Disabled;
-            endpoint.snapshot = None;
-            endpoint.snapshot_generation = None;
-            endpoint.methods = None;
-            endpoint.agent_recency.clear();
-            endpoint.agent_presentation = Default::default();
-            endpoint.agent_view_projection = None;
-            endpoint.pending_agent_view_projection = None;
-            endpoint.agent_view_projection_supported = false;
-        }
-    }
-
     pub(crate) fn set_endpoint_status(
         &mut self,
         endpoint_id: &ClientEndpointId,
@@ -712,6 +689,30 @@ impl ClientShellState {
         };
         if endpoint_id == &self.active_endpoint_id {
             self.apply_active_snapshot(snapshot, generation);
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn retire_endpoint(&mut self, endpoint_id: &ClientEndpointId) {
+        self.clear_machine_diagnostic(endpoint_id);
+        if endpoint_id == &self.active_endpoint_id {
+            self.pending_workspace_highlight = None;
+        }
+        self.retire_endpoint_notifications(endpoint_id);
+        if let Some(endpoint) = self
+            .endpoints
+            .iter_mut()
+            .find(|endpoint| &endpoint.endpoint_id == endpoint_id)
+        {
+            endpoint.status = ClientEndpointStatus::Disabled;
+            endpoint.snapshot = None;
+            endpoint.snapshot_generation = None;
+            endpoint.methods = None;
+            endpoint.agent_recency.clear();
+            endpoint.agent_presentation = Default::default();
+            endpoint.agent_view_projection = None;
+            endpoint.pending_agent_view_projection = None;
+            endpoint.agent_view_projection_supported = false;
         }
     }
 }

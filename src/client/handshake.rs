@@ -24,32 +24,24 @@ use super::{shell, ClientError};
 /// Time to wait for the server's Welcome reply during the handshake.
 ///
 /// A local client talks to an already-connected server, so 5s is plenty. The
-/// remote bridge client (`herdr --remote`) sits behind a fresh per-attach ssh
+/// remote bridge client (upstream `herdr --remote`) sits behind a fresh per-attach ssh
 /// connection whose cold-connect (TCP + key exchange + auth) happens inside this
 /// window; on a high-latency link that easily exceeds 5s, so it gets a far
 /// larger budget. See issue #753.
 pub(super) const LOCAL_HANDSHAKE_READ_TIMEOUT: Duration = Duration::from_secs(5);
 pub(super) const REMOTE_HANDSHAKE_READ_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// Remote attach over SSH is not supported in this offline build, so a client
+/// process is always a local client.
 pub(super) fn is_remote_client_process() -> bool {
-    std::env::var(crate::remote::REMOTE_KEYBINDINGS_ENV_VAR).is_ok()
+    false
 }
 
 pub(super) fn client_shell_keybinding_source() -> shell::ClientShellKeybindingSource {
-    match std::env::var(crate::remote::REMOTE_KEYBINDINGS_ENV_VAR)
-        .ok()
-        .as_deref()
-    {
-        Some("server") => shell::ClientShellKeybindingSource::Endpoint,
-        Some(_) => shell::ClientShellKeybindingSource::RemoteLocal,
-        None => shell::ClientShellKeybindingSource::Local,
-    }
+    shell::ClientShellKeybindingSource::Local
 }
 
 pub(super) fn handshake_read_timeout() -> Duration {
-    if is_remote_client_process() {
-        return REMOTE_HANDSHAKE_READ_TIMEOUT;
-    }
     LOCAL_HANDSHAKE_READ_TIMEOUT
 }
 
@@ -126,33 +118,6 @@ pub(super) struct HandshakeResult {
     pub(super) encoding: RenderEncoding,
     pub(super) endpoint_methods: Option<Vec<String>>,
     pub(super) endpoint_capabilities: Option<Vec<String>>,
-}
-
-pub(crate) fn probe_endpoint_negotiation(
-    stream: &mut LocalStream,
-) -> io::Result<super::endpoint::EndpointNegotiation> {
-    let handshake = do_handshake(
-        stream,
-        80,
-        24,
-        0,
-        0,
-        HandshakePixelCapabilities {
-            exact_geometry: false,
-            sgr_mouse: false,
-        },
-        Some(crate::protocol::ClientSurfaceSize { cols: 80, rows: 24 }),
-        false,
-        false,
-        false,
-        false, // This probe uses an SSH bridge, not a shared filesystem.
-        &AtomicBool::new(false),
-    )
-    .map_err(io::Error::other)?;
-    Ok(super::endpoint::EndpointNegotiation::new(
-        handshake.endpoint_methods.unwrap_or_default(),
-        handshake.endpoint_capabilities.unwrap_or_default(),
-    ))
 }
 
 pub(super) struct HandshakePixelCapabilities {
@@ -243,7 +208,7 @@ pub(super) fn do_handshake(
             return Err(ClientError::Protocol(protocol::FramingError::Io(
                 io::Error::new(
                     io::ErrorKind::InvalidData,
-                    "server does not support the stable Herdr endpoint protocol; update this machine",
+                    "server does not support the stable sy-term endpoint protocol; update this machine",
                 ),
             )));
         };
@@ -314,6 +279,7 @@ mod tests {
     use super::*;
 
     fn stream_pair() -> (LocalStream, LocalStream) {
+        #[cfg(unix)]
         use interprocess::local_socket::traits::Listener as _;
         let path = std::env::temp_dir().join(format!(
             "hhs-{}-{:x}.sock",

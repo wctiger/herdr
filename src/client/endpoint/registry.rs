@@ -129,11 +129,6 @@ impl EndpointRegistry {
                 .is_some_and(|connection| connection.surface_active)
     }
 
-    pub(crate) fn select_unavailable_local(&mut self) {
-        self.active = ClientEndpointId::Local;
-        self.freeze_input();
-    }
-
     pub(crate) fn freeze_input(&mut self) {
         self.input_enabled = false;
     }

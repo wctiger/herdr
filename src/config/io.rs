@@ -9,21 +9,19 @@ const KNOWN_TOP_LEVEL_CONFIG_KEYS: &[&str] = &[
     "experimental",
     "keys",
     "onboarding",
-    "remote",
     "server",
     "session",
     "terminal",
     "theme",
     "ui",
-    "update",
     "worktrees",
 ];
 
 pub fn app_dir_name() -> &'static str {
     if cfg!(debug_assertions) {
-        "herdr-dev"
+        "sy-term-dev"
     } else {
-        "herdr"
+        "sy-term"
     }
 }
 
@@ -239,7 +237,7 @@ pub fn config_diagnostic_summary(diagnostics: &[String]) -> Option<String> {
         ""
     };
 
-    Some(format!("{target}{impact}; herdr config check"))
+    Some(format!("{target}{impact}; sy-term config check"))
 }
 
 pub fn load_live_config() -> Result<LoadedConfig, Vec<String>> {
@@ -329,14 +327,6 @@ fn load_live_config_from_str(content: &str) -> Result<LoadedConfig, Vec<String>>
     );
     load_live_section(
         table,
-        "update",
-        "update config",
-        &mut diagnostics,
-        &mut invalid_sections,
-        |section| config.update = section,
-    );
-    load_live_section(
-        table,
         "ui",
         "ui config",
         &mut diagnostics,
@@ -366,14 +356,6 @@ fn load_live_config_from_str(content: &str) -> Result<LoadedConfig, Vec<String>>
         &mut diagnostics,
         &mut invalid_sections,
         |section| config.experimental = section,
-    );
-    load_live_section(
-        table,
-        "remote",
-        "remote config",
-        &mut diagnostics,
-        &mut invalid_sections,
-        |section| config.remote = section,
     );
 
     diagnostics.extend(config.theme.diagnostics());
@@ -769,10 +751,10 @@ mod tests {
     #[test]
     fn remove_section_key_removes_matching_key_from_section() {
         let content =
-            "[ui.toast]\nenabled = true\ndelivery = \"herdr\"\n[ui.sound]\nenabled = true\n";
+            "[ui.toast]\nenabled = true\ndelivery = \"sy-term\"\n[ui.sound]\nenabled = true\n";
         let updated = remove_section_key(content, "ui.toast", "enabled");
         assert!(!updated.contains("[ui.toast]\nenabled = true"));
-        assert!(updated.contains("delivery = \"herdr\""));
+        assert!(updated.contains("delivery = \"sy-term\""));
         assert!(updated.contains("[ui.sound]\nenabled = true"));
     }
 
@@ -788,7 +770,7 @@ mod tests {
 
         assert_eq!(
             config_diagnostic_summary(&diagnostics).as_deref(),
-            Some("config.toml; herdr config check")
+            Some("config.toml; sy-term config check")
         );
     }
 
@@ -801,7 +783,7 @@ mod tests {
 
         assert_eq!(
             config_diagnostic_summary(&diagnostics).as_deref(),
-            Some("config.toml has unknown keys; herdr config check")
+            Some("config.toml has unknown keys; sy-term config check")
         );
     }
 
@@ -814,7 +796,7 @@ mod tests {
 
         assert_eq!(
             config_diagnostic_summary(&diagnostics).as_deref(),
-            Some("config.toml; herdr config check")
+            Some("config.toml; sy-term config check")
         );
     }
 
@@ -827,7 +809,7 @@ mod tests {
 
         assert_eq!(
             config_diagnostic_summary(&diagnostics).as_deref(),
-            Some("config.toml invalid; using defaults; herdr config check")
+            Some("config.toml invalid; using defaults; sy-term config check")
         );
     }
 
@@ -836,14 +818,14 @@ mod tests {
         let startup = vec!["config read error: permission denied; using defaults".to_string()];
         assert_eq!(
             config_diagnostic_summary(&startup).as_deref(),
-            Some("config.toml unreadable; using defaults; herdr config check")
+            Some("config.toml unreadable; using defaults; sy-term config check")
         );
 
         let reload =
             vec!["config read error: permission denied; keeping current config".to_string()];
         assert_eq!(
             config_diagnostic_summary(&reload).as_deref(),
-            Some("config.toml unreadable; keeping current config; herdr config check")
+            Some("config.toml unreadable; keeping current config; sy-term config check")
         );
     }
 
@@ -856,7 +838,7 @@ mod tests {
 
         assert_eq!(
             config_diagnostic_summary(&diagnostics).as_deref(),
-            Some("config.toml invalid; keeping current config; herdr config check")
+            Some("config.toml invalid; keeping current config; sy-term config check")
         );
     }
 
@@ -864,7 +846,7 @@ mod tests {
     fn config_loaders_report_unreadable_path() {
         let _guard = crate::config::test_config_env_lock().lock().unwrap();
         let path =
-            std::env::temp_dir().join(format!("herdr-config-unreadable-{}", std::process::id()));
+            std::env::temp_dir().join(format!("syt-config-unreadable-{}", std::process::id()));
         std::fs::create_dir_all(&path).unwrap();
         std::env::set_var(CONFIG_PATH_ENV_VAR, &path);
 
@@ -922,7 +904,7 @@ name = "catppucin"
 delivery = "system"
 
 [ui.toast]
-delivery = "herdr"
+delivery = "sy-term"
 "#,
         )
         .unwrap();
@@ -1044,7 +1026,7 @@ mouse_captur = true
     fn startup_config_accepts_legacy_agent_panel_scope_without_warning() {
         let _guard = crate::config::test_config_env_lock().lock().unwrap();
         let path = std::env::temp_dir().join(format!(
-            "herdr-config-legacy-agent-panel-scope-{}.toml",
+            "syt-config-legacy-agent-panel-scope-{}.toml",
             std::process::id()
         ));
         std::fs::write(&path, "[ui]\nagent_panel_scope = \"all\"\n").unwrap();
@@ -1062,7 +1044,7 @@ mouse_captur = true
     fn startup_config_load_warns_about_unknown_top_level_sections() {
         let _guard = crate::config::test_config_env_lock().lock().unwrap();
         let path = std::env::temp_dir().join(format!(
-            "herdr-config-unknown-section-{}.toml",
+            "syt-config-unknown-section-{}.toml",
             std::process::id()
         ));
         std::fs::write(
@@ -1180,7 +1162,7 @@ mouse_capture = false
     fn config_load_recovers_from_a_mid_file_bom() {
         let _guard = crate::config::test_config_env_lock().lock().unwrap();
         let path = std::env::temp_dir().join(format!(
-            "herdr-config-mid-file-bom-{}.toml",
+            "syt-config-mid-file-bom-{}.toml",
             std::process::id()
         ));
         std::fs::write(

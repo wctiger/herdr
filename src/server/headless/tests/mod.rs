@@ -183,7 +183,6 @@ fn completed_handoff_disables_only_old_server_session_persistence() {
     assert!(!server.app.policy.persist_session);
     assert!(server.app.policy.restore_session);
     assert!(server.app.policy.persist_plugin_registry);
-    assert!(server.app.policy.background_updates);
 }
 
 #[test]
@@ -294,13 +293,14 @@ fn server_stop_interrupts_server_event_backlog() {
 #[test]
 fn headless_api_request_drains_all_pending_internal_events_before_reading_state() {
     let mut server = test_headless_server();
-    for i in 0..=crate::app::APP_EVENT_DRAIN_LIMIT {
+    for _ in 0..=crate::app::APP_EVENT_DRAIN_LIMIT {
         server
             .app
             .event_tx
-            .try_send(AppEvent::UpdateReady {
-                version: format!("4.0.{i}"),
-                install_command: "herdr install".into(),
+            .try_send(AppEvent::HookAuthorityCleared {
+                pane_id: crate::layout::PaneId::from_raw(u32::MAX),
+                source: None,
+                seq: None,
             })
             .unwrap();
     }
@@ -322,11 +322,6 @@ fn headless_api_request_drains_all_pending_internal_events_before_reading_state(
     let response: serde_json::Value = serde_json::from_str(&response).unwrap();
 
     assert_eq!(response["result"]["type"], "ok");
-    let expected_version = format!("4.0.{}", crate::app::APP_EVENT_DRAIN_LIMIT);
-    assert_eq!(
-        server.app.state.update_available.as_deref(),
-        Some(expected_version.as_str())
-    );
     assert!(server.app.event_rx.try_recv().is_err());
 }
 
@@ -556,10 +551,10 @@ fn api_window_title_wins_until_it_is_cleared() {
     let (mut server, control_rx) = window_title_test_server();
     server.app.configure_window_title("{workspace}");
 
-    server.handle_client_window_title_api("set".into(), Some("herdr api".into()));
+    server.handle_client_window_title_api("set".into(), Some("sy-term api".into()));
     assert_eq!(
         next_window_title(&control_rx),
-        Some(Some("herdr api".to_string()))
+        Some(Some("sy-term api".to_string()))
     );
 
     server.app.state.workspaces[0].custom_name = Some("ops".into());
@@ -581,10 +576,10 @@ fn clearing_the_api_title_falls_back_to_herdr_when_window_titles_are_disabled() 
     let (mut server, control_rx) = window_title_test_server();
     server.app.configure_window_title("");
 
-    server.handle_client_window_title_api("set".into(), Some("herdr api".into()));
+    server.handle_client_window_title_api("set".into(), Some("sy-term api".into()));
     assert_eq!(
         next_window_title(&control_rx),
-        Some(Some("herdr api".to_string()))
+        Some(Some("sy-term api".to_string()))
     );
 
     server.handle_client_window_title_api("clear".into(), None);
@@ -3339,7 +3334,7 @@ async fn worktree_discovery_does_not_block_client_typing() {
     let (runtime, mut input_rx) =
         crate::terminal::TerminalRuntime::test_with_channel_and_scrollback_bytes(80, 24, 0, b"", 4);
     workspace.insert_test_runtime(pane_id, runtime);
-    let repo = std::env::temp_dir().join(format!("herdr-blocked-git-{}", workspace.id));
+    let repo = std::env::temp_dir().join(format!("syt-blocked-git-{}", workspace.id));
     workspace.identity_cwd = repo.clone();
     workspace.cached_git_space = Some(crate::workspace::GitSpaceMetadata {
         key: repo.display().to_string(),
@@ -3439,7 +3434,7 @@ async fn worktree_discovery_does_not_block_client_typing() {
 async fn deferred_worktree_open_disconnect_keeps_other_clients_focus() {
     let mut server = test_headless_server();
     let mut source = crate::workspace::Workspace::test_new("pending-open-source");
-    let repo = std::env::temp_dir().join(format!("herdr-disconnected-open-{}", source.id));
+    let repo = std::env::temp_dir().join(format!("syt-disconnected-open-{}", source.id));
     let checkout = repo.with_extension("checkout");
     let git = |args: &[&str]| {
         let output = std::process::Command::new("git")
@@ -3457,9 +3452,9 @@ async fn deferred_worktree_open_disconnect_keeps_other_clients_focus() {
         "-C",
         repo.to_str().unwrap(),
         "-c",
-        "user.name=Herdr Test",
+        "user.name=sy-term Test",
         "-c",
-        "user.email=herdr@example.invalid",
+        "user.email=sy-term@example.invalid",
         "commit",
         "--quiet",
         "--allow-empty",
@@ -4017,6 +4012,101 @@ fn client_shell_host_theme_follows_foreground_client() {
         Some(crate::terminal_theme::HostAppearance::Light)
     );
     assert!(!server.app.state.host_terminal_appearance_explicit);
+}
+
+#[tokio::test]
+async fn foreground_switch_coalesces_pending_appearance_before_releasing_colors() {
+    use crate::terminal::{TerminalId, TerminalRuntime};
+    use crate::terminal_theme::{HostAppearance, RgbColor, TerminalTheme};
+
+    for incoming in [Some(HostAppearance::Dark), None] {
+        let mut server = test_headless_server();
+        server.app.set_host_terminal_theme(TerminalTheme {
+            background: Some(RgbColor {
+                r: 17,
+                g: 17,
+                b: 17,
+            }),
+            ..Default::default()
+        });
+        server
+            .app
+            .set_host_terminal_appearance_state(Some(HostAppearance::Dark), true);
+        let (runtime, mut rx) = TerminalRuntime::test_with_channel(80, 24);
+        runtime.apply_host_terminal_theme(server.app.state.host_terminal_theme);
+        runtime.apply_host_terminal_appearance(Some(HostAppearance::Dark));
+        runtime.test_process_pty_bytes(b"\x1b[?2031h");
+        let id = TerminalId::alloc();
+        server.app.terminal_runtimes.insert(id.clone(), runtime);
+        server
+            .app
+            .set_host_terminal_appearance_state(Some(HostAppearance::Light), true);
+        assert!(rx.try_recv().is_err());
+
+        let mut client = ClientConnection::new(
+            (80, 24),
+            crate::kitty_graphics::HostCellSize::default(),
+            2,
+            RenderEncoding::SemanticFrame,
+            None,
+        );
+        client.host_terminal_theme.background = Some(RgbColor {
+            r: 255,
+            g: 255,
+            b: 255,
+        });
+        client.host_terminal_appearance = incoming;
+        client.host_terminal_appearance_explicit = incoming.is_some();
+        server.clients.insert(2, client);
+        server.foreground_client_id = Some(2);
+        server.sync_foreground_client_state();
+        assert!(
+            rx.try_recv().is_err(),
+            "must not announce outgoing client A Light"
+        );
+        let expected =
+            incoming.map(|appearance| bytes::Bytes::from_static(appearance.color_scheme_report()));
+        assert_eq!(
+            server
+                .app
+                .terminal_runtimes
+                .get(&id)
+                .unwrap()
+                .test_process_pty_bytes(b"\x1b[?996n"),
+            expected.into_iter().collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
+fn pending_host_appearance_is_released_by_headless_deadline() {
+    use crate::terminal_theme::{HostAppearance, RgbColor, TerminalTheme};
+
+    let mut server = test_headless_server();
+    server.app.set_host_terminal_theme(TerminalTheme {
+        background: Some(RgbColor {
+            r: 17,
+            g: 17,
+            b: 17,
+        }),
+        ..Default::default()
+    });
+    server
+        .app
+        .set_host_terminal_appearance_state(Some(HostAppearance::Dark), true);
+    server
+        .app
+        .set_host_terminal_appearance_state(Some(HostAppearance::Light), true);
+    let deadline = server.app.pending_host_appearance_deadline.unwrap();
+    assert!(
+        server
+            .app
+            .next_headless_loop_deadline_with_git_refresh(Instant::now(), false, false)
+            .unwrap()
+            <= deadline
+    );
+    server.handle_scheduled_tasks_headless(deadline, false);
+    assert!(server.app.pending_host_appearance_deadline.is_none());
 }
 
 #[test]
@@ -4927,7 +5017,7 @@ fn windows_shutdown_probe_preserves_panes_and_agent_sessions() {
             .map(|key| (key, std::env::var_os(key))),
     );
     let config_home = std::env::temp_dir().join(format!(
-        "herdr-shutdown-{}-{}",
+        "syt-shutdown-{}-{}",
         std::process::id(),
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -5290,13 +5380,13 @@ fn terminal_attach_client_exits_when_worktree_runtime_restore_fails() {
 #[test]
 fn terminal_attach_client_exits_when_worktree_remove_succeeds() {
     let mut server = test_headless_server();
-    let checkout = PathBuf::from("/repo/herdr-issue");
+    let checkout = PathBuf::from("/repo/syt-issue");
     let parent = crate::workspace::Workspace::test_new("parent");
     let mut workspace = crate::workspace::Workspace::test_new("worktree");
     workspace.worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
         key: "repo-key".into(),
-        label: "herdr".into(),
-        repo_root: "/repo/herdr".into(),
+        label: "sy-term".into(),
+        repo_root: "/repo/sy-term".into(),
         checkout_path: checkout.clone(),
         is_linked_worktree: true,
     });
@@ -6162,16 +6252,6 @@ fn headless_scheduled_tasks_expire_agent_metadata() {
                     } if title.is_none()
                 )
         }));
-}
-
-#[test]
-fn headless_scheduled_tasks_clears_disabled_agent_manifest_update_deadline() {
-    let mut server = test_headless_server();
-    let now = Instant::now();
-    server.app.next_agent_manifest_update_check = Some(now - Duration::from_millis(1));
-
-    assert!(!server.handle_scheduled_tasks_headless(now, false));
-    assert_eq!(server.app.next_agent_manifest_update_check, None);
 }
 
 #[cfg(unix)]
@@ -7385,7 +7465,7 @@ fn oversized_paste_rejection_notifies_only_the_sending_client() {
     ) {
         ServerMessage::ClientShellError { message } => assert_eq!(
             message,
-            "Paste rejected: Input message is 5000012 bytes; Herdr's limit is 1048576 bytes"
+            "Paste rejected: Input message is 5000012 bytes; sy-term's limit is 1048576 bytes"
         ),
         other => panic!("expected client shell paste error, got {other:?}"),
     }
@@ -7415,7 +7495,7 @@ fn oversized_paste_rejection_notifies_only_the_sending_client() {
     ) {
         ServerMessage::ClientShellError { message } => assert_eq!(
             message,
-            "Paste rejected: Input message is 7000000 bytes; Herdr's limit is 1048576 bytes"
+            "Paste rejected: Input message is 7000000 bytes; sy-term's limit is 1048576 bytes"
         ),
         other => panic!("expected client shell paste error, got {other:?}"),
     }
@@ -7428,87 +7508,6 @@ fn oversized_paste_rejection_notifies_only_the_sending_client() {
     assert_eq!(server.foreground_client_id, Some(2));
     assert_eq!(server.clients.len(), 3);
     assert!(server.app.state.toast.is_none());
-}
-
-#[test]
-fn update_notification_reaches_client_shell_independent_of_delivery() {
-    let mut server = test_headless_server();
-    let (client_tx, client_control_rx, _client_rx) = test_client_writer();
-
-    server.clients.insert(
-        1,
-        ClientConnection::new(
-            (80, 24),
-            crate::kitty_graphics::HostCellSize::default(),
-            1,
-            RenderEncoding::SemanticFrame,
-            Some(client_tx),
-        ),
-    );
-    server.foreground_client_id = Some(1);
-    server.app.state.toast_config.delivery = crate::config::ToastDelivery::Herdr;
-
-    let changed = server.handle_internal_event_with_forwarding(AppEvent::UpdateReady {
-        version: "9.9.9".to_string(),
-        install_command: "herdr update".into(),
-    });
-
-    assert!(changed);
-    assert!(matches!(
-        read_server_message(
-            client_control_rx
-                .recv_timeout(Duration::from_millis(100))
-                .expect("semantic update notification")
-        ),
-        ServerMessage::SemanticNotification(protocol::SemanticNotification {
-            kind: protocol::SemanticNotificationKind::UpdateInstalled,
-            ..
-        })
-    ));
-}
-
-#[test]
-fn update_notification_is_semantic_for_system_delivery() {
-    let mut server = test_headless_server();
-    let (client_tx, client_control_rx, _client_rx) = test_client_writer();
-
-    server.clients.insert(
-        1,
-        ClientConnection::new(
-            (80, 24),
-            crate::kitty_graphics::HostCellSize::default(),
-            1,
-            RenderEncoding::SemanticFrame,
-            Some(client_tx),
-        ),
-    );
-    server.foreground_client_id = Some(1);
-    server.app.state.toast_config.delivery = crate::config::ToastDelivery::System;
-
-    let changed = server.handle_internal_event_with_forwarding(AppEvent::UpdateReady {
-        version: "9.9.9".to_string(),
-        install_command: "herdr update".into(),
-    });
-
-    assert!(changed);
-    match read_server_message(
-        client_control_rx
-            .recv_timeout(Duration::from_millis(100))
-            .expect("semantic update notification"),
-    ) {
-        ServerMessage::SemanticNotification(notification) => {
-            assert_eq!(
-                notification.kind,
-                protocol::SemanticNotificationKind::UpdateInstalled
-            );
-            assert_eq!(notification.title, "Herdr v9.9.9 available");
-            assert_eq!(
-                notification.body.as_deref(),
-                Some("detach, run `herdr update`, then run Herdr again to reconnect")
-            );
-        }
-        other => panic!("expected semantic update notification, got {other:?}"),
-    }
 }
 
 #[test]

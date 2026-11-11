@@ -268,7 +268,7 @@ fn spawn_windows_client_accept_thread(
     should_quit: Arc<AtomicBool>,
     server_event_tx: mpsc::Sender<ServerEvent>,
 ) -> io::Result<std::thread::JoinHandle<()>> {
-    crate::thread_spawn::spawn_named("herdr-client-accept", move || {
+    crate::thread_spawn::spawn_named("sy-term-client-accept", move || {
         let mut next_client_id = 1_u64;
         while !should_quit.load(Ordering::Acquire) {
             let stream = match listener.accept() {
@@ -293,7 +293,7 @@ fn spawn_windows_client_accept_thread(
 
             let should_quit = should_quit.clone();
             let server_event_tx = server_event_tx.clone();
-            let spawned = crate::thread_spawn::spawn_named("herdr-client-conn", move || {
+            let spawned = crate::thread_spawn::spawn_named("sy-term-client-conn", move || {
                 if let Err(err) = crate::server::client_transport::handle_client_handshake(
                     stream,
                     client_id,
@@ -845,11 +845,11 @@ impl HeadlessServer {
         if outer_terminal_focus == Some(true) {
             self.app.state.mark_active_tab_seen();
         }
-        self.app.set_host_terminal_appearance_state(
+        self.app.set_host_terminal_state(
+            host_terminal_theme,
             host_terminal_appearance,
             host_terminal_appearance_explicit,
         );
-        self.app.set_host_terminal_theme(host_terminal_theme);
     }
 
     fn sync_visible_server_config_diagnostic(&mut self, uses_local_keybindings: bool) {
@@ -2109,7 +2109,8 @@ impl HeadlessServer {
                 size,
                 max,
             } => {
-                let detail = format!("Input message is {size} bytes; Herdr's limit is {max} bytes");
+                let detail =
+                    format!("Input message is {size} bytes; sy-term's limit is {max} bytes");
                 let message = if matches!(
                     self.clients.get(&client_id).map(|client| &client.mode),
                     Some(ClientConnectionMode::ClientShell)
@@ -2270,11 +2271,11 @@ impl HeadlessServer {
                 if !client.shell_surface_active || self.foreground_client_id != Some(client_id) {
                     return false;
                 }
-                let mut changed = self.app.set_host_terminal_appearance_state(
+                let changed = self.app.set_host_terminal_state(
+                    client.host_terminal_theme,
                     client.host_terminal_appearance,
                     client.host_terminal_appearance_explicit,
                 );
-                changed |= self.app.set_host_terminal_theme(client.host_terminal_theme);
                 if changed {
                     self.resize_shared_runtime_to_effective_size_before_input();
                 }
@@ -3334,22 +3335,6 @@ impl HeadlessServer {
 
         if self
             .app
-            .next_auto_update_check
-            .is_some_and(|deadline| now >= deadline)
-        {
-            self.app.run_auto_update_check();
-        }
-
-        if self
-            .app
-            .next_agent_manifest_update_check
-            .is_some_and(|deadline| now >= deadline)
-        {
-            self.app.run_agent_manifest_update_check();
-        }
-
-        if self
-            .app
             .session_save_deadline
             .is_some_and(|deadline| now >= deadline)
         {
@@ -3365,6 +3350,7 @@ impl HeadlessServer {
             changed = true;
         }
 
+        changed |= self.app.release_host_appearance_if_ready(now);
         changed |= self.app.handle_tab_bar_status_tasks(now);
 
         if geometry_dirty {

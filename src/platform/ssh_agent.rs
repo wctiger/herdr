@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn server_without_an_agent_leaves_local_pane_agent_setup_alone() {
-        let directory = std::env::temp_dir().join(format!("herdr-no-agent-{}", std::process::id()));
+        let directory = std::env::temp_dir().join(format!("syt-no-agent-{}", std::process::id()));
         fs::create_dir(&directory).unwrap();
         let stable = directory.join("agent");
         for inherited in [None, Some(PathBuf::new())] {
@@ -290,8 +290,7 @@ mod tests {
 
     #[test]
     fn closed_agent_listener_does_not_block_a_live_replacement() {
-        let directory =
-            std::env::temp_dir().join(format!("herdr-dead-agent-{}", std::process::id()));
+        let directory = std::env::temp_dir().join(format!("syt-dead-agent-{}", std::process::id()));
         fs::create_dir(&directory).unwrap();
         let stable = directory.join("agent");
         let a = directory.join("a");
@@ -328,8 +327,7 @@ mod tests {
     fn unestablished_agent_connection_does_not_block_a_live_replacement() {
         use std::os::fd::AsRawFd;
         use std::os::unix::net::UnixStream;
-        let directory =
-            std::env::temp_dir().join(format!("herdr-busy-agent-{}", std::process::id()));
+        let directory = std::env::temp_dir().join(format!("syt-busy-agent-{}", std::process::id()));
         fs::create_dir(&directory).unwrap();
         let a = directory.join("a");
         let b = directory.join("b");
@@ -515,8 +513,7 @@ mod tests {
 
     #[test]
     fn reconnect_and_overlapping_attachments_keep_a_stable_agent_address() {
-        let directory =
-            std::env::temp_dir().join(format!("herdr-ssh-agent-{}", std::process::id()));
+        let directory = std::env::temp_dir().join(format!("syt-ssh-agent-{}", std::process::id()));
         fs::create_dir(&directory).unwrap();
         let stable = directory.join("agent");
         let a = directory.join("a");

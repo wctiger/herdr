@@ -109,16 +109,15 @@ fn shell_new_controls_use_the_same_client_action_routes_as_keybinds() {
 #[test]
 fn remote_client_preferences_keep_the_same_identity_across_bridge_processes() {
     let first = ClientShellConfig::from_config(&Config::default()).with_endpoint_preferences(
-        std::path::Path::new("/tmp/herdr-remote-100-dev-agents.sock"),
+        std::path::Path::new("/tmp/syt-remote-100-dev-agents.sock"),
         Some(r#"["dev", "agents"]"#),
     );
     let next = ClientShellConfig::from_config(&Config::default()).with_endpoint_preferences(
-        std::path::Path::new("/tmp/herdr-remote-200-dev-agents.sock"),
+        std::path::Path::new("/tmp/syt-remote-200-dev-agents.sock"),
         Some(r#"["dev", "agents"]"#),
     );
     assert_eq!(first.preferences_path, next.preferences_path);
-    let root =
-        std::env::temp_dir().join(format!("herdr-remote-preferences-{}", std::process::id()));
+    let root = std::env::temp_dir().join(format!("syt-remote-preferences-{}", std::process::id()));
     let first_path = root.join(
         first
             .preferences_path
@@ -181,62 +180,6 @@ fn remote_client_preferences_process_child() {
     let restored = ClientShellState::new(config);
     assert_eq!(restored.sidebar_width, 31);
     assert!(restored.sidebar_collapsed);
-}
-
-#[test]
-fn manual_client_chrome_preferences_round_trip_per_endpoint() {
-    let path = std::env::temp_dir().join(format!(
-        "herdr-client-shell-prefs-{}.json",
-        std::process::id()
-    ));
-    let _ = std::fs::remove_file(&path);
-    let config =
-        ClientShellConfig::from_config(&Config::default()).with_preferences_path(path.clone());
-    let mut state = ClientShellState::new(config);
-    state.sidebar_width = 31;
-    state.sidebar_width_manual = true;
-    state.sidebar_section_split = 0.7;
-    state.sidebar_section_split_manual = true;
-    state.sidebar_collapsed = true;
-    state.sidebar_collapsed_manual = true;
-    state.collapsed_groups.insert("repo-two".into());
-    state.collapsed_groups.insert("repo-one".into());
-    let profile =
-        SavedSshEndpoint::new("Build", "dev@build.example", "agents").expect("saved SSH profile");
-    let remote_id = ClientEndpointId::Ssh(profile.id.clone());
-    state
-        .remote_collapsed_groups
-        .insert(remote_id.clone(), HashSet::from(["/repo".to_owned()]));
-    state.persist_chrome_preferences(&mut ClientShellInput::default());
-    let stored = std::fs::read_to_string(&path).expect("stored client chrome preferences");
-    assert!(stored.contains(profile.id.as_str()));
-    assert!(stored.contains("repo-one"));
-    assert!(!stored.contains(&profile.label));
-    assert!(!stored.contains(&profile.target));
-
-    let reloaded_config =
-        ClientShellConfig::from_config(&Config::default()).with_preferences_path(path.clone());
-    let reloaded = ClientShellState::new(reloaded_config);
-    assert_eq!(reloaded.sidebar_width, 31);
-    assert!(reloaded.sidebar_width_manual);
-    assert_eq!(reloaded.sidebar_section_split, 0.7);
-    assert!(reloaded.sidebar_section_split_manual);
-    assert!(reloaded.sidebar_collapsed);
-    assert!(reloaded.sidebar_collapsed_manual);
-    assert_eq!(
-        reloaded.collapsed_groups,
-        HashSet::from(["repo-one".to_string(), "repo-two".to_string()])
-    );
-    assert_eq!(
-        reloaded.remote_collapsed_groups.get(&remote_id),
-        Some(&HashSet::from(["/repo".to_owned()]))
-    );
-    let mut reloaded = reloaded;
-    reloaded.persist_chrome_preferences(&mut ClientShellInput::default());
-    let stored_again = std::fs::read_to_string(&path).expect("restored client chrome preferences");
-    assert!(stored_again.contains(profile.id.as_str()));
-    assert!(stored_again.contains("/repo"));
-    std::fs::remove_file(path).expect("remove client chrome preferences");
 }
 
 #[test]

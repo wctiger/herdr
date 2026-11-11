@@ -18,7 +18,6 @@ pub(super) fn run_server_command(args: &[String]) -> std::io::Result<Option<i32>
         "--handoff-import" => Ok(None),
         "reload-config" => server_reload_config(&args[1..]).map(Some),
         "agent-manifests" => server_agent_manifests(&args[1..]).map(Some),
-        "update-agent-manifests" => server_update_agent_manifests(&args[1..]).map(Some),
         "reload-agent-manifests" => server_reload_agent_manifests(&args[1..]).map(Some),
         "help" | "--help" | "-h" => {
             print_server_help();
@@ -33,12 +32,8 @@ pub(super) fn run_server_command(args: &[String]) -> std::io::Result<Option<i32>
 
 fn server_stop(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr server stop");
+        eprintln!("usage: sy-term server stop");
         return Ok(2);
-    }
-
-    if super::target::is_remote() {
-        return super::send_ok_request(Method::ServerStop(EmptyParams::default()));
     }
 
     match crate::session::stop_active_server() {
@@ -52,7 +47,7 @@ fn server_stop(args: &[String]) -> std::io::Result<i32> {
 
 fn server_reload_config(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr server reload-config");
+        eprintln!("usage: sy-term server reload-config");
         return Ok(2);
     }
 
@@ -67,7 +62,7 @@ fn server_agent_manifests(args: &[String]) -> std::io::Result<i32> {
         [] => false,
         [flag] if flag == "--json" => true,
         _ => {
-            eprintln!("usage: herdr server agent-manifests [--json]");
+            eprintln!("usage: sy-term server agent-manifests [--json]");
             return Ok(2);
         }
     };
@@ -86,7 +81,7 @@ fn server_agent_manifests(args: &[String]) -> std::io::Result<i32> {
 
 fn server_reload_agent_manifests(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr server reload-agent-manifests");
+        eprintln!("usage: sy-term server reload-agent-manifests");
         return Ok(2);
     }
 
@@ -94,69 +89,6 @@ fn server_reload_agent_manifests(args: &[String]) -> std::io::Result<i32> {
         id: "cli:server:reload-agent-manifests".into(),
         method: Method::ServerReloadAgentManifests(EmptyParams::default()),
     })?)
-}
-
-fn server_update_agent_manifests(args: &[String]) -> std::io::Result<i32> {
-    let json = match args {
-        [] => false,
-        [flag] if flag == "--json" => true,
-        _ => {
-            eprintln!("usage: herdr server update-agent-manifests [--json]");
-            return Ok(2);
-        }
-    };
-
-    let response = match update_agent_manifest_status(super::send_request, || {
-        crate::detect::manifest_update::check_and_update().map(|_| ())
-    })? {
-        Ok(response) => response,
-        Err(err) => {
-            if json {
-                return super::print_response(&agent_manifest_update_error_response(&err));
-            }
-            eprintln!("failed to update agent detection manifests: {err}");
-            return Ok(1);
-        }
-    };
-    if json || response.get("error").is_some() {
-        return super::print_response(&response);
-    }
-
-    print_agent_manifest_status(&response);
-    Ok(0)
-}
-
-fn update_agent_manifest_status(
-    mut send_request: impl FnMut(&Request) -> std::io::Result<serde_json::Value>,
-    update_manifests: impl FnOnce() -> Result<(), String>,
-) -> std::io::Result<Result<serde_json::Value, String>> {
-    if let Err(err) = update_manifests() {
-        return Ok(Err(err));
-    }
-
-    let reload_response = send_request(&Request {
-        id: "cli:server:reload-agent-manifests".into(),
-        method: Method::ServerReloadAgentManifests(EmptyParams::default()),
-    })?;
-    if reload_response.get("error").is_some() {
-        return Ok(Ok(reload_response));
-    }
-
-    send_request(&Request {
-        id: "cli:server:agent-manifests".into(),
-        method: Method::ServerAgentManifests(EmptyParams::default()),
-    })
-    .map(Ok)
-}
-
-fn agent_manifest_update_error_response(err: &str) -> serde_json::Value {
-    serde_json::json!({
-        "id": "cli:server:update-agent-manifests",
-        "error": {
-            "code": "agent_manifest_update_failed",
-            "message": err,
-        }
-    })
 }
 
 fn print_agent_manifest_status(response: &serde_json::Value) {
@@ -240,7 +172,7 @@ fn server_live_handoff(args: &[String]) -> std::io::Result<i32> {
     eprintln!(
         "live handoff complete; server log: {}",
         crate::session::data_dir()
-            .join("herdr-server.log")
+            .join("sy-term-server.log")
             .display()
     );
     Ok(0)
@@ -248,106 +180,27 @@ fn server_live_handoff(args: &[String]) -> std::io::Result<i32> {
 
 fn parse_live_handoff_params(args: &[String]) -> Result<ServerLiveHandoffParams, ParseError> {
     projection::parse(
-        live_handoff_command().bin_name("herdr server live-handoff"),
+        live_handoff_command().bin_name("sy-term server live-handoff"),
         args,
         ServerLiveHandoffProjection::from_matches,
     )
 }
 
 fn print_server_help() {
-    eprintln!("herdr server commands:");
-    eprintln!("  herdr server                run as headless server");
+    eprintln!("sy-term server commands:");
+    eprintln!("  sy-term server                run as headless server");
     #[cfg(windows)]
-    eprintln!("  herdr server --allow-unelevated-clients  allow ordinary same-account clients to control an elevated server");
-    eprintln!("  herdr server stop           stop the running server via the API socket");
-    eprintln!("  herdr server live-handoff   hand off live panes to a new local server");
-    eprintln!("  herdr server reload-config  reload config.toml in the running server");
-    eprintln!("  herdr server agent-manifests [--json]  show agent detection manifest status");
-    eprintln!("  herdr server update-agent-manifests [--json]  fetch and reload agent detection manifests");
-    eprintln!("  herdr server reload-agent-manifests  reload agent detection manifests in the running server");
+    eprintln!("  sy-term server --allow-unelevated-clients  allow ordinary same-account clients to control an elevated server");
+    eprintln!("  sy-term server stop           stop the running server via the API socket");
+    eprintln!("  sy-term server live-handoff   hand off live panes to a new local server");
+    eprintln!("  sy-term server reload-config  reload config.toml in the running server");
+    eprintln!("  sy-term server agent-manifests [--json]  show agent detection manifest status");
+    eprintln!("  sy-term server reload-agent-manifests  reload agent detection manifests in the running server");
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn update_agent_manifest_status_fetches_reloads_then_reads_status() {
-        let mut methods = Vec::new();
-        let response = update_agent_manifest_status(
-            |request| {
-                methods.push(request.method.clone());
-                match &request.method {
-                    Method::ServerReloadAgentManifests(_) => Ok(serde_json::json!({
-                        "id": request.id,
-                        "result": { "type": "agent_manifest_reload", "manifests": [] }
-                    })),
-                    Method::ServerAgentManifests(_) => Ok(serde_json::json!({
-                        "id": request.id,
-                        "result": {
-                            "type": "agent_manifest_status",
-                            "last_result": "checked",
-                            "manifests": []
-                        }
-                    })),
-                    _ => panic!("unexpected request"),
-                }
-            },
-            || Ok(()),
-        )
-        .unwrap()
-        .unwrap();
-
-        assert_eq!(response["result"]["type"], "agent_manifest_status");
-        assert_eq!(
-            methods,
-            vec![
-                Method::ServerReloadAgentManifests(EmptyParams::default()),
-                Method::ServerAgentManifests(EmptyParams::default())
-            ]
-        );
-    }
-
-    #[test]
-    fn update_agent_manifest_status_skips_server_when_fetch_fails() {
-        let response = update_agent_manifest_status(
-            |_request| panic!("server should not be called after fetch failure"),
-            || Err("network unavailable".to_string()),
-        )
-        .unwrap();
-
-        assert_eq!(response, Err("network unavailable".to_string()));
-        assert_eq!(
-            agent_manifest_update_error_response("network unavailable")["error"]["code"],
-            "agent_manifest_update_failed"
-        );
-    }
-
-    #[test]
-    fn update_agent_manifest_status_stops_after_reload_error() {
-        let mut methods = Vec::new();
-        let response = update_agent_manifest_status(
-            |request| {
-                methods.push(request.method.clone());
-                Ok(serde_json::json!({
-                    "id": request.id,
-                    "error": {
-                        "code": "reload_failed",
-                        "message": "reload failed"
-                    }
-                }))
-            },
-            || Ok(()),
-        )
-        .unwrap()
-        .unwrap();
-
-        assert_eq!(response["error"]["code"], "reload_failed");
-        assert_eq!(
-            methods,
-            vec![Method::ServerReloadAgentManifests(EmptyParams::default())]
-        );
-    }
 
     #[test]
     fn live_handoff_projection_preserves_defaults_and_stays_hidden() {
@@ -375,7 +228,7 @@ mod tests {
     fn live_handoff_params_parse_remote_update_fields() {
         let args = vec![
             "--import-exe".to_string(),
-            "/home/me/.local/bin/herdr".to_string(),
+            "/home/me/.local/bin/sy-term".to_string(),
             "--expected-protocol=9".to_string(),
             "--expected-version".to_string(),
             "0.6.2".to_string(),
@@ -385,7 +238,7 @@ mod tests {
 
         assert_eq!(
             params.import_exe.as_deref(),
-            Some("/home/me/.local/bin/herdr")
+            Some("/home/me/.local/bin/sy-term")
         );
         assert_eq!(params.expected_protocol, Some(9));
         assert_eq!(params.expected_version.as_deref(), Some("0.6.2"));

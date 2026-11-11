@@ -289,7 +289,7 @@ pub(crate) fn resume() -> Input<Option<Vec<String>>> {
     .value_name("RESUME_ARG")
     .configure(|arg| arg.required(false).num_args(0..).last(true))
     .help(
-        "Command that resumes this session after a Herdr restart; starts with a plain command name",
+        "Command that resumes this session after a sy-term restart; starts with a plain command name",
     )
 }
 
@@ -404,7 +404,7 @@ impl Leaf {
         match self.name {
             "input" => command.group(clap::ArgGroup::new("selector").args(["pane_id", "pane", "current"]).required(true)),
             "move" => command.group(clap::ArgGroup::new("destination").args(["tab", "new-tab", "new-workspace"]).required(true)),
-            "send-text" => command.after_help("next: herdr pane run <PANE_ID> <COMMAND> sends text and Enter in one call"),
+            "send-text" => command.after_help("next: sy-term pane run <PANE_ID> <COMMAND> sends text and Enter in one call"),
             "send-keys" => command.after_help("Use esc as the canonical Escape key name; escape is also accepted."),
             "wait-output" => command.after_help("The selected snapshot is searched immediately, including existing output, then polled. Without --timeout, this waits indefinitely."),
             _ => command,
@@ -413,7 +413,8 @@ impl Leaf {
 
     pub(super) fn request(&self, args: &[String]) -> Result<Request, ParseError> {
         let mut method = projection::parse(
-            self.command().bin_name(format!("herdr pane {}", self.name)),
+            self.command()
+                .bin_name(format!("sy-term pane {}", self.name)),
             args,
             self.method,
         )?;
@@ -470,7 +471,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             params.caller_pane_id = super::caller_target(
                 matches,
                 params.caller_pane_id,
-                crate::cli::target::caller_pane_id().as_deref(),
+                crate::cli::caller_pane_id().as_deref(),
                 true,
                 false,
             )?;
@@ -496,7 +497,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             params.pane_id = super::caller_target(
                 matches,
                 params.pane_id,
-                crate::cli::target::caller_pane_id().as_deref(),
+                crate::cli::caller_pane_id().as_deref(),
                 false,
                 false,
             )?;
@@ -514,7 +515,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             params.pane_id = super::caller_target(
                 matches,
                 params.pane_id,
-                crate::cli::target::caller_pane_id().as_deref(),
+                crate::cli::caller_pane_id().as_deref(),
                 false,
                 false,
             )?;
@@ -540,7 +541,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             params.pane_id = super::caller_target(
                 matches,
                 params.pane_id,
-                crate::cli::target::caller_pane_id().as_deref(),
+                crate::cli::caller_pane_id().as_deref(),
                 false,
                 false,
             )?;
@@ -604,7 +605,7 @@ pub(super) const LEAVES: &[Leaf] = &[
         method: |matches| {
             let mut params = PaneInputProjection::from_matches(matches)?;
             if matches.get_flag("current") {
-                params.pane_id = crate::cli::target::caller_pane_id()
+                params.pane_id = crate::cli::caller_pane_id()
                     .map(|value| crate::cli::normalize_pane_id(&value))
                     .ok_or_else(|| ParseError::Usage("--current requires HERDR_PANE_ID".into()))?;
             }
@@ -622,7 +623,7 @@ pub(super) const LEAVES: &[Leaf] = &[
             params.target_pane_id = super::caller_target(
                 matches,
                 params.target_pane_id,
-                crate::cli::target::caller_pane_id().as_deref(),
+                crate::cli::caller_pane_id().as_deref(),
                 true,
                 true,
             )?;

@@ -39,7 +39,6 @@ use std::time::{Duration, Instant};
 pub(crate) const MIN_RENDER_INTERVAL: Duration = Duration::from_millis(16);
 const GIT_REMOTE_STATUS_REFRESH_INTERVAL: Duration = Duration::from_millis(1500);
 const GIT_REPO_DISCOVERY_REFRESH_INTERVAL: Duration = Duration::from_secs(5 * 60);
-const AUTO_UPDATE_CHECK_INTERVAL: Duration = Duration::from_secs(30 * 60);
 const PENDING_AGENT_RESUME_THEME_WAIT: Duration = Duration::from_millis(750);
 const SESSION_SAVE_DEBOUNCE: Duration = Duration::from_secs(5);
 
@@ -74,7 +73,6 @@ pub(crate) struct AppPolicy {
     pub(crate) restore_session: bool,
     pub(crate) persist_session: bool,
     pub(crate) persist_plugin_registry: bool,
-    pub(crate) background_updates: bool,
 }
 
 impl AppPolicy {
@@ -82,7 +80,6 @@ impl AppPolicy {
         restore_session: true,
         persist_session: true,
         persist_plugin_registry: true,
-        background_updates: true,
     };
 
     #[cfg(test)]
@@ -90,7 +87,6 @@ impl AppPolicy {
         restore_session: false,
         persist_session: false,
         persist_plugin_registry: false,
-        background_updates: false,
     };
 
     #[cfg(unix)]
@@ -98,7 +94,6 @@ impl AppPolicy {
         restore_session: false,
         persist_session: true,
         persist_plugin_registry: true,
-        background_updates: true,
     };
 }
 
@@ -133,19 +128,18 @@ pub struct App {
     pub(crate) pending_worktree_remove_runtime_exits: HashMap<crate::layout::PaneId, usize>,
     pub(crate) pending_worktree_remove_runtime_restores: HashMap<crate::layout::PaneId, u64>,
     pub(crate) next_api_worktree_operation_id: u64,
-    pub(crate) next_auto_update_check: Option<Instant>,
-    pub(crate) next_agent_manifest_update_check: Option<Instant>,
-    pub(crate) update_version_check_enabled: bool,
-    pub(crate) update_manifest_check_enabled: bool,
     pub(crate) loaded_host_cursor: crate::config::HostCursorModeConfig,
     pub(crate) agent_metadata_deadline: Option<Instant>,
     pub(crate) pending_agent_resume_deadline: Option<Instant>,
+    pub(crate) pending_host_appearance_deadline: Option<Instant>,
+    pane_host_appearance: Option<crate::terminal_theme::HostAppearance>,
     startup_per_agent_delay: Duration,
     next_agent_resume_at: Option<Instant>,
     pub(crate) session_save_deadline: Option<Instant>,
     pub(crate) session_save_thread: Option<std::thread::JoinHandle<()>>,
     session_writer: Arc<std::sync::Mutex<crate::persist::SessionWriter>>,
     pane_exit_checkpoint_pending: bool,
+    server_hangup_probe: fn() -> bool,
     pub(crate) detached_process_children: Vec<std::process::Child>,
     tab_bar_status_generation: u64,
     tab_bar_datetimes: Vec<tab_bar_status::TabBarDatetimeRuntime>,
@@ -177,14 +171,6 @@ pub struct App {
 
 pub(crate) const APP_EVENT_CHANNEL_CAPACITY: usize = 256;
 pub(crate) const APP_EVENT_DRAIN_LIMIT: usize = 64;
-
-fn auto_updates_enabled(background_updates: bool) -> bool {
-    background_updates && !cfg!(debug_assertions)
-}
-
-fn background_update_check_enabled(background_updates: bool, check_enabled: bool) -> bool {
-    auto_updates_enabled(background_updates) && check_enabled
-}
 
 fn load_plugin_registry(
     persist_plugin_registry: bool,
@@ -467,14 +453,7 @@ impl App {
         );
 
         let latest_release_notes = crate::release_notes::load_latest();
-        let update_available = latest_release_notes
-            .as_ref()
-            .filter(|notes| notes.preview)
-            .map(|notes| notes.version.clone());
         let latest_release_notes_available = latest_release_notes.is_some();
-        let update_install_command = crate::update::update_install_command().to_string();
-        let startup_product_announcement =
-            crate::product_announcements::load_unseen_for_current_version();
 
         let mode = if active.is_some() {
             state::Mode::Terminal
@@ -505,24 +484,14 @@ impl App {
             request_client_config_reload: false,
             worktree_directory,
             latest_release_notes,
-            product_announcement: startup_product_announcement.map(|announcement| {
-                state::ProductAnnouncementState {
-                    version: announcement.version,
-                    id: announcement.id,
-                    title: announcement.title,
-                    body: announcement.body,
-                    scroll: 0,
-                    preview: announcement.preview,
-                }
-            }),
+            product_announcement: None,
             view: state::ViewState {
                 terminal_area: Rect::default(),
                 pane_infos: Vec::new(),
             },
-            update_available,
-            update_install_command,
+            update_available: None,
+            update_install_command: String::new(),
             latest_release_notes_available,
-            update_dismissed: false,
             config_diagnostic,
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
@@ -561,7 +530,6 @@ impl App {
             host_terminal_appearance_explicit: false,
             integration_recommendations: crate::integration::integration_recommendations(),
             agent_manifest_summaries,
-            agent_manifest_update_status: crate::detect::manifest_update::load_status(),
             installed_plugins: load_plugin_registry(
                 policy.persist_plugin_registry,
                 &mut plugin_installation_leases,
@@ -578,32 +546,6 @@ impl App {
         };
 
         state.terminals = restored_terminals;
-
-        // Background auto-update is disabled for non-persistent test apps
-        // and in debug/test builds so local development never mutates the
-        // running binary out from under spawned test processes.
-        let version_check_enabled =
-            background_update_check_enabled(policy.background_updates, config.update.version_check);
-        let manifest_check_enabled = background_update_check_enabled(
-            policy.background_updates,
-            config.update.manifest_check,
-        );
-        if version_check_enabled {
-            let update_tx = event_tx.clone();
-            if let Err(err) = crate::thread_spawn::spawn_named("herdr-update-check", move || {
-                crate::update::auto_update(update_tx)
-            }) {
-                tracing::warn!(err = %err, "failed to spawn update check thread");
-            }
-        }
-        if manifest_check_enabled {
-            let manifest_update_tx = event_tx.clone();
-            if let Err(err) = crate::thread_spawn::spawn_named("herdr-manifest-check", move || {
-                crate::detect::manifest_update::auto_update(manifest_update_tx)
-            }) {
-                tracing::warn!(err = %err, "failed to spawn agent manifest check thread");
-            }
-        }
 
         let last_focus = state.active.and_then(|idx| {
             state
@@ -642,15 +584,11 @@ impl App {
             pending_worktree_remove_runtime_exits: HashMap::new(),
             pending_worktree_remove_runtime_restores: HashMap::new(),
             next_api_worktree_operation_id: 1,
-            next_auto_update_check: version_check_enabled
-                .then_some(Instant::now() + AUTO_UPDATE_CHECK_INTERVAL),
-            next_agent_manifest_update_check: manifest_check_enabled
-                .then_some(Instant::now() + AUTO_UPDATE_CHECK_INTERVAL),
-            update_version_check_enabled: config.update.version_check,
-            update_manifest_check_enabled: config.update.manifest_check,
             loaded_host_cursor: config.ui.host_cursor,
             agent_metadata_deadline: None,
             pending_agent_resume_deadline: None,
+            pending_host_appearance_deadline: None,
+            pane_host_appearance: None,
             startup_per_agent_delay: Duration::from_millis(
                 config.session.startup_per_agent_delay_ms.into(),
             ),
@@ -659,6 +597,11 @@ impl App {
             session_save_thread: None,
             session_writer,
             pane_exit_checkpoint_pending: false,
+            #[cfg(not(test))]
+            server_hangup_probe: crate::platform::server_hangup_is_recent,
+            // Real SIGHUP evidence is process-global; tests opt in per App.
+            #[cfg(test)]
+            server_hangup_probe: || false,
             detached_process_children: Vec::new(),
             tab_bar_status_generation: 0,
             tab_bar_datetimes: Vec::new(),
@@ -795,17 +738,9 @@ impl App {
     }
 
     pub(crate) fn dismiss_product_announcement(&mut self) {
-        if let Some(announcement) = self.state.product_announcement.take() {
-            if !announcement.preview {
-                if let Err(err) =
-                    crate::product_announcements::mark_seen(&announcement.version, &announcement.id)
-                {
-                    self.state.config_diagnostic =
-                        Some(format!("failed to update announcement status: {err}"));
-                    self.config_diagnostic_deadline = Some(Instant::now() + Duration::from_secs(5));
-                }
-            }
-        }
+        // Product announcements were delivered by the online update manifest,
+        // which this build does not use; dismissing only clears local state.
+        self.state.product_announcement = None;
     }
 
     pub(crate) fn reload_config(&mut self) -> crate::config::ConfigReloadReport {
@@ -925,7 +860,7 @@ impl App {
                 != self.startup_per_agent_delay
         {
             diagnostics.push(
-                "session.startup_per_agent_delay_ms changes require restarting Herdr; kept current setting"
+                "session.startup_per_agent_delay_ms changes require restarting sy-term; kept current setting"
                     .into(),
             );
         }
@@ -936,7 +871,7 @@ impl App {
             && config.kitty_graphics_enabled() != self.state.kitty_graphics_enabled
         {
             diagnostics.push(
-                "terminal.kitty_graphics changes require restarting Herdr; kept current setting"
+                "terminal.kitty_graphics changes require restarting sy-term; kept current setting"
                     .into(),
             );
         }
@@ -965,37 +900,6 @@ impl App {
 
         if !invalid_section("advanced") {
             self.state.pane_scrollback_limit_bytes = config.advanced.scrollback_limit_bytes;
-        }
-
-        if !invalid_section("update") {
-            let now = Instant::now();
-            let previous_version_check_enabled = self.update_version_check_enabled;
-            let previous_manifest_check_enabled = self.update_manifest_check_enabled;
-            self.update_version_check_enabled = config.update.version_check;
-            self.update_manifest_check_enabled = config.update.manifest_check;
-
-            if !self.update_version_check_enabled {
-                self.next_auto_update_check = None;
-            } else if !previous_version_check_enabled
-                && background_update_check_enabled(
-                    self.policy.background_updates,
-                    self.update_version_check_enabled,
-                )
-                && self.state.update_available.is_none()
-            {
-                self.next_auto_update_check = Some(now);
-            }
-
-            if !self.update_manifest_check_enabled {
-                self.next_agent_manifest_update_check = None;
-            } else if !previous_manifest_check_enabled
-                && background_update_check_enabled(
-                    self.policy.background_updates,
-                    self.update_manifest_check_enabled,
-                )
-            {
-                self.next_agent_manifest_update_check = Some(now);
-            }
         }
 
         if !invalid_section("terminal") {
@@ -1080,7 +984,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!("herdr-{name}-{}-{stamp}", std::process::id()))
+        std::env::temp_dir().join(format!("syt-{name}-{}-{stamp}", std::process::id()))
     }
 
     fn config_env_lock() -> &'static Mutex<()> {
@@ -1089,7 +993,7 @@ mod tests {
 
     fn temp_config_path(name: &str) -> std::path::PathBuf {
         let unique = format!(
-            "herdr-{name}-{}-{}",
+            "syt-{name}-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -1097,14 +1001,6 @@ mod tests {
                 .as_nanos()
         );
         std::env::temp_dir().join(unique).join("config.toml")
-    }
-
-    fn restore_xdg_state_home(original: Option<std::ffi::OsString>) {
-        if let Some(value) = original {
-            std::env::set_var("XDG_STATE_HOME", value);
-        } else {
-            std::env::remove_var("XDG_STATE_HOME");
-        }
     }
 
     #[test]
@@ -1354,33 +1250,31 @@ mod tests {
     #[test]
     fn internal_event_drain_limits_work_per_tick() {
         let mut app = test_app();
-        for i in 0..=APP_EVENT_DRAIN_LIMIT {
+        for _ in 0..=APP_EVENT_DRAIN_LIMIT {
             app.event_tx
-                .try_send(AppEvent::UpdateReady {
-                    version: format!("2.0.{i}"),
-                    install_command: "herdr install".into(),
+                .try_send(AppEvent::HookAuthorityCleared {
+                    pane_id: crate::layout::PaneId::from_raw(u32::MAX),
+                    source: None,
+                    seq: None,
                 })
                 .unwrap();
         }
 
-        assert!(app.drain_internal_events());
+        app.drain_internal_events();
 
-        let expected_version = format!("2.0.{}", APP_EVENT_DRAIN_LIMIT - 1);
-        assert_eq!(
-            app.state.update_available.as_deref(),
-            Some(expected_version.as_str())
-        );
         assert!(app.event_rx.try_recv().is_ok());
+        assert!(app.event_rx.try_recv().is_err());
     }
 
     #[test]
     fn api_request_drains_all_pending_internal_events_before_reading_state() {
         let mut app = test_app();
-        for i in 0..=APP_EVENT_DRAIN_LIMIT {
+        for _ in 0..=APP_EVENT_DRAIN_LIMIT {
             app.event_tx
-                .try_send(AppEvent::UpdateReady {
-                    version: format!("3.0.{i}"),
-                    install_command: "herdr install".into(),
+                .try_send(AppEvent::HookAuthorityCleared {
+                    pane_id: crate::layout::PaneId::from_raw(u32::MAX),
+                    source: None,
+                    seq: None,
                 })
                 .unwrap();
         }
@@ -1394,11 +1288,6 @@ mod tests {
         let response: serde_json::Value = serde_json::from_str(&response).unwrap();
 
         assert_eq!(response["result"]["type"], "ok");
-        let expected_version = format!("3.0.{APP_EVENT_DRAIN_LIMIT}");
-        assert_eq!(
-            app.state.update_available.as_deref(),
-            Some(expected_version.as_str())
-        );
         assert!(app.event_rx.try_recv().is_err());
     }
 
@@ -1562,58 +1451,6 @@ mod tests {
     }
 
     #[test]
-    fn startup_restores_preview_update_available_from_saved_notes() {
-        let _guard = config_env_lock().lock().unwrap();
-        let path = temp_config_path("startup-preview-update-available");
-        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
-
-        // Use a bogus far-future version so preview=true regardless of current binary version.
-        crate::release_notes::save_pending("99.99.99", "### Changed\n- One").unwrap();
-
-        let app = test_app();
-
-        assert_eq!(app.state.update_available.as_deref(), Some("99.99.99"));
-        assert!(app.state.latest_release_notes_available);
-        assert_eq!(
-            app.state
-                .latest_release_notes
-                .as_ref()
-                .map(|notes| notes.version.as_str()),
-            Some("99.99.99")
-        );
-
-        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
-    }
-
-    #[test]
-    fn update_ready_refreshes_cached_release_notes() {
-        let _guard = config_env_lock().lock().unwrap();
-        let path = temp_config_path("update-ready-refreshes-release-notes");
-        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
-        let mut app = test_app();
-        assert!(app.state.latest_release_notes.is_none());
-
-        crate::release_notes::save_pending("99.99.99", "### Changed\n- One").unwrap();
-        app.handle_internal_event(AppEvent::UpdateReady {
-            version: "99.99.99".into(),
-            install_command: "herdr update".into(),
-        });
-
-        assert_eq!(
-            app.state.latest_release_notes.as_ref().map(|notes| (
-                notes.version.as_str(),
-                notes.body.as_str(),
-                notes.preview
-            )),
-            Some(("99.99.99", "### Changed\n- One", true))
-        );
-
-        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
-    }
-
-    #[test]
     fn release_notes_dismiss_api_marks_current_seen_but_keeps_preview_unseen() {
         let _guard = config_env_lock().lock().unwrap();
         let path = temp_config_path("release-notes-dismiss-persistence");
@@ -1655,23 +1492,6 @@ mod tests {
     }
 
     #[test]
-    fn startup_does_not_restore_update_available_from_older_saved_notes() {
-        let _guard = config_env_lock().lock().unwrap();
-        let path = temp_config_path("startup-stale-update-notes");
-        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
-
-        crate::release_notes::save_pending("0.4.9", "### Changed\n- One").unwrap();
-
-        let app = test_app();
-
-        assert_eq!(app.state.update_available, None);
-        assert!(app.state.latest_release_notes_available);
-
-        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
-    }
-
-    #[test]
     fn startup_keeps_pending_release_notes_available_without_auto_opening() {
         let _guard = config_env_lock().lock().unwrap();
         let path = temp_config_path("startup-pending-release-notes-no-auto-open");
@@ -1701,141 +1521,6 @@ mod tests {
     }
 
     #[test]
-    fn startup_loads_unseen_product_announcement_for_clients() {
-        let _guard = config_env_lock().lock().unwrap();
-        let path = temp_config_path("startup-product-announcement-auto-open");
-        let state_home = path.parent().unwrap().join("state");
-        let original_xdg_state_home = std::env::var_os("XDG_STATE_HOME");
-        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
-        std::env::set_var("XDG_STATE_HOME", &state_home);
-
-        crate::release_notes::save_pending(env!("CARGO_PKG_VERSION"), "### Changed\n- One")
-            .unwrap();
-        crate::product_announcements::save_manifest_announcement(
-            env!("CARGO_PKG_VERSION"),
-            Some(&crate::product_announcements::ManifestAnnouncement {
-                id: "startup-announcement".into(),
-                title: Some("Startup announcement".into()),
-                body: "### Announcement\n- One".into(),
-            }),
-        )
-        .unwrap();
-
-        let config = Config {
-            onboarding: Some(false),
-            ..Default::default()
-        };
-        let (_api_tx, api_rx) = tokio::sync::mpsc::unbounded_channel();
-
-        let app = App::new(
-            &config,
-            crate::app::AppPolicy::TEST,
-            None,
-            api_rx,
-            crate::api::EventHub::default(),
-        );
-
-        assert_eq!(app.state.mode, Mode::Navigate);
-        assert_eq!(
-            app.state
-                .product_announcement
-                .as_ref()
-                .map(|announcement| announcement.id.as_str()),
-            Some("startup-announcement")
-        );
-
-        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
-        restore_xdg_state_home(original_xdg_state_home);
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
-    }
-
-    #[test]
-    fn reload_config_updates_live_state() {
-        let _guard = config_env_lock().lock().unwrap();
-        let path = temp_config_path("reload-config-success");
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(
-            &path,
-            "[terminal]\ndefault_shell = \"nu\"\nshell_mode = \"non_login\"\nnew_cwd = \"home\"\n[keys]\nnew_workspace = \"prefix+m\"\nprefix = \"ctrl+a\"\n[update]\nversion_check = false\nmanifest_check = false\n[server]\nheadless_cols = 160\nheadless_rows = 50\n[ui]\nagent_panel_sort = \"priority\"\n[ui.toast]\ndelivery = \"herdr\"\n",
-        )
-        .unwrap();
-        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
-
-        let mut app = test_app();
-        app.next_auto_update_check = Some(Instant::now());
-        app.next_agent_manifest_update_check = Some(Instant::now());
-        let report = app.reload_config();
-
-        assert_eq!(report.status, crate::config::ConfigReloadStatus::Applied);
-        assert_eq!(app.state.headless_size, (160, 50));
-        assert_eq!(
-            app.state.prefix_keys,
-            vec![(KeyCode::Char('a'), KeyModifiers::CONTROL)]
-        );
-        assert!(app
-            .state
-            .keybinds
-            .new_workspace
-            .matches_prefix(&KeyEvent::new(KeyCode::Char('m'), KeyModifiers::empty())));
-        assert_eq!(
-            app.state.toast_config.delivery,
-            crate::config::ToastDelivery::Herdr
-        );
-        assert_eq!(app.state.agent_panel_sort, state::AgentPanelSort::Priority);
-        let report = app.reload_config();
-        assert_eq!(report.status, crate::config::ConfigReloadStatus::Applied);
-        assert!(app.state.request_client_config_reload);
-        assert_eq!(app.state.default_shell, "nu");
-        assert_eq!(
-            app.state.shell_mode,
-            crate::config::ShellModeConfig::NonLogin
-        );
-        assert_eq!(
-            app.state.new_terminal_cwd,
-            crate::config::NewTerminalCwdConfig::Home
-        );
-        assert!(!app.update_version_check_enabled);
-        assert!(!app.update_manifest_check_enabled);
-        assert!(app.next_auto_update_check.is_none());
-        assert!(app.next_agent_manifest_update_check.is_none());
-        assert!(app.state.config_diagnostic.is_none());
-        let toast = app.state.toast.as_ref().unwrap();
-        assert_eq!(toast.kind, crate::app::state::ToastKind::UpdateInstalled);
-        assert_eq!(toast.title, "reloaded config");
-        assert_eq!(toast.context, "using config.toml");
-
-        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
-    }
-
-    #[test]
-    fn reload_config_keeps_kitty_graphics_until_restart() {
-        let _guard = config_env_lock().lock().unwrap();
-        let path = temp_config_path("reload-config-kitty-graphics");
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(&path, "[terminal]\nkitty_graphics = false\n").unwrap();
-        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
-
-        let mut app = test_app();
-        assert!(app.state.kitty_graphics_enabled);
-
-        let report = app.reload_config();
-
-        assert_eq!(report.status, crate::config::ConfigReloadStatus::Partial);
-        assert!(app.state.kitty_graphics_enabled);
-        assert_eq!(
-            report.diagnostics,
-            vec![
-                "terminal.kitty_graphics changes require restarting Herdr; kept current setting"
-                    .to_owned()
-            ]
-        );
-
-        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
-    }
-
-    #[test]
     fn reload_config_reports_startup_delay_requires_restart() {
         let mut app = test_app();
         let mut config = Config::default();
@@ -1847,7 +1532,7 @@ mod tests {
         assert_eq!(report.status, crate::config::ConfigReloadStatus::Partial);
         assert_eq!(app.startup_per_agent_delay, Duration::from_millis(100));
         assert_eq!(report.diagnostics, vec![
-            "session.startup_per_agent_delay_ms changes require restarting Herdr; kept current setting"
+            "session.startup_per_agent_delay_ms changes require restarting sy-term; kept current setting"
         ]);
 
         let report = app.apply_live_config(&config, &[], &["session".into()], false);
@@ -2006,7 +1691,7 @@ mod tests {
         );
         assert_eq!(
             app.state.config_diagnostic.as_deref(),
-            Some("config.toml; herdr config check")
+            Some("config.toml; sy-term config check")
         );
 
         std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
@@ -2068,7 +1753,7 @@ mod tests {
         assert_eq!(app.state.pane_borders, target_pane_borders);
         assert_eq!(
             app.state.config_diagnostic.as_deref(),
-            Some("config.toml has unknown keys; herdr config check")
+            Some("config.toml has unknown keys; sy-term config check")
         );
 
         std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
@@ -2197,7 +1882,7 @@ mod tests {
             .config_diagnostic
             .as_deref()
             .is_some_and(|message| {
-                message == "config.toml invalid; keeping current config; herdr config check"
+                message == "config.toml invalid; keeping current config; sy-term config check"
             }));
         assert!(app.state.toast.is_none());
 
@@ -2418,8 +2103,8 @@ mod tests {
     #[test]
     fn workspace_creation_in_navigate_mode_uses_selected_workspace_seed_cwd() {
         let mut app = test_app();
-        let mut first = Workspace::test_new("herdr");
-        first.identity_cwd = std::path::PathBuf::from("/tmp/herdr");
+        let mut first = Workspace::test_new("sy-term");
+        first.identity_cwd = std::path::PathBuf::from("/tmp/sy-term");
         let mut second = Workspace::test_new("pion");
         second.identity_cwd = std::path::PathBuf::from("/tmp/pion");
 
@@ -2439,10 +2124,10 @@ mod tests {
     fn new_terminal_cwd_follow_uses_source_cwd() {
         let cwd = creation::resolve_new_terminal_cwd(
             &crate::config::NewTerminalCwdConfig::Follow,
-            Some(std::path::PathBuf::from("/tmp/herdr-source")),
+            Some(std::path::PathBuf::from("/tmp/syt-source")),
         );
 
-        assert_eq!(cwd, std::path::PathBuf::from("/tmp/herdr-source"));
+        assert_eq!(cwd, std::path::PathBuf::from("/tmp/syt-source"));
     }
 
     #[test]
@@ -2460,11 +2145,11 @@ mod tests {
     #[test]
     fn new_terminal_cwd_path_uses_configured_path() {
         let cwd = creation::resolve_new_terminal_cwd(
-            &crate::config::NewTerminalCwdConfig::Path("/tmp/herdr-fixed".into()),
-            Some(std::path::PathBuf::from("/tmp/herdr-source")),
+            &crate::config::NewTerminalCwdConfig::Path("/tmp/syt-fixed".into()),
+            Some(std::path::PathBuf::from("/tmp/syt-source")),
         );
 
-        assert_eq!(cwd, std::path::PathBuf::from("/tmp/herdr-fixed"));
+        assert_eq!(cwd, std::path::PathBuf::from("/tmp/syt-fixed"));
     }
 
     #[test]
@@ -3122,17 +2807,17 @@ mod tests {
         let mut parent = Workspace::test_new("api-pane-close-parent");
         parent.worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
+            checkout_path: "/repo/sy-term".into(),
             is_linked_worktree: false,
         });
         let mut child = Workspace::test_new("api-pane-close-child");
         child.worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr-child".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
+            checkout_path: "/repo/syt-child".into(),
             is_linked_worktree: true,
         });
         app.state.workspaces = vec![parent, child];
@@ -3166,35 +2851,6 @@ mod tests {
 
         assert!(!app.state.session_dirty);
         assert!(app.session_save_deadline.is_some());
-    }
-
-    #[test]
-    fn headless_next_loop_deadline_ignores_resize_poll() {
-        let mut app = test_app();
-        let now = Instant::now();
-        app.session_save_deadline = Some(now + Duration::from_secs(2));
-        app.next_auto_update_check = Some(now + Duration::from_secs(6));
-
-        assert_eq!(
-            app.next_headless_loop_deadline_with_git_refresh(now, false, true),
-            app.session_save_deadline
-        );
-    }
-
-    #[test]
-    fn headless_next_loop_deadline_returns_none_when_resize_poll_is_only_deadline() {
-        let mut app = test_app();
-        let now = Instant::now();
-        app.config_diagnostic_deadline = None;
-        app.toast_deadline = None;
-        app.next_auto_update_check = None;
-        app.session_save_deadline = None;
-        app.state.workspaces.clear();
-
-        assert_eq!(
-            app.next_headless_loop_deadline_with_git_refresh(now, false, true),
-            None
-        );
     }
 
     #[test]
@@ -3300,7 +2956,7 @@ mod tests {
     }
 
     #[test]
-    fn normal_autosave_replaces_a_signaled_exit_checkpoint() {
+    fn normal_autosave_preserves_a_signaled_exit_checkpoint() {
         let _guard = crate::config::test_config_env_lock().lock().unwrap();
         let config_home = unique_temp_path("signaled-pane-autosave");
         std::env::set_var("XDG_CONFIG_HOME", &config_home);
@@ -3326,7 +2982,78 @@ mod tests {
         }
         app.save_session_on_shutdown();
 
+        assert!(crate::persist::load().is_some());
+
+        std::env::remove_var("XDG_CONFIG_HOME");
+        let _ = std::fs::remove_dir_all(config_home);
+    }
+
+    #[test]
+    fn normal_last_pane_exit_clears_saved_session() {
+        let _guard = crate::config::test_config_env_lock().lock().unwrap();
+        let config_home = unique_temp_path("normal-last-pane-exit");
+        std::env::set_var("XDG_CONFIG_HOME", &config_home);
+        std::env::remove_var(crate::session::SESSION_ENV_VAR);
+
+        let mut app = test_app();
+        app.policy.persist_session = true;
+        let workspace = Workspace::test_new("closed");
+        let pane_id = workspace.tabs[0].root_pane;
+        app.state.workspaces = vec![workspace];
+        app.state.active = Some(0);
+        app.state.ensure_test_terminals();
+        app.save_session_now();
+
+        app.handle_internal_event(AppEvent::PaneDied {
+            pane_id,
+            exit_reason: crate::platform::ChildExitReason::Exited,
+        });
+        app.start_background_session_save();
+        if let Some(thread) = app.session_save_thread.take() {
+            thread.join().unwrap();
+        }
+        app.save_session_on_shutdown();
         assert!(crate::persist::load().is_none());
+
+        std::env::remove_var("XDG_CONFIG_HOME");
+        let _ = std::fs::remove_dir_all(config_home);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn server_hangup_preserves_unsignaled_pane_exit_checkpoint() {
+        let _guard = crate::config::test_config_env_lock().lock().unwrap();
+        let config_home = unique_temp_path("hangup-unsignaled-pane-exit");
+        std::env::set_var("XDG_CONFIG_HOME", &config_home);
+        std::env::remove_var(crate::session::SESSION_ENV_VAR);
+
+        let mut app = test_app();
+        app.policy.persist_session = true;
+        let mut workspace = Workspace::test_new("preserved");
+        let first_pane = workspace.tabs[0].root_pane;
+        let second_pane = workspace.test_split(ratatui::layout::Direction::Horizontal);
+        app.state.workspaces = vec![workspace];
+        app.state.active = Some(0);
+        app.state.ensure_test_terminals();
+        app.save_session_now();
+
+        app.server_hangup_probe = || true;
+        for pane_id in [first_pane, second_pane] {
+            app.handle_internal_event(AppEvent::PaneDied {
+                pane_id,
+                exit_reason: crate::platform::ChildExitReason::Exited,
+            });
+        }
+        assert!(app.state.workspaces.is_empty());
+        app.start_background_session_save();
+        if let Some(thread) = app.session_save_thread.take() {
+            thread.join().unwrap();
+        }
+        app.save_session_on_shutdown();
+
+        let snapshot = crate::persist::load().expect("hangup checkpoint must survive autosave");
+        assert_eq!(snapshot.workspaces.len(), 1);
+        assert_eq!(snapshot.workspaces[0].tabs[0].panes.len(), 2);
 
         std::env::remove_var("XDG_CONFIG_HOME");
         let _ = std::fs::remove_dir_all(config_home);
@@ -3404,11 +3131,12 @@ mod tests {
             AgentState::Working
         );
 
-        for i in 0..APP_EVENT_CHANNEL_CAPACITY {
+        for _ in 0..APP_EVENT_CHANNEL_CAPACITY {
             app.event_tx
-                .try_send(AppEvent::UpdateReady {
-                    version: format!("9.9.{i}"),
-                    install_command: "herdr update".into(),
+                .try_send(AppEvent::HookAuthorityCleared {
+                    pane_id: crate::layout::PaneId::from_raw(u32::MAX),
+                    source: None,
+                    seq: None,
                 })
                 .unwrap();
         }
@@ -3452,5 +3180,32 @@ mod tests {
             AgentState::Idle,
             "Working→Idle should still apply after temporary queue pressure"
         );
+    }
+
+    #[test]
+    fn reload_config_keeps_kitty_graphics_until_restart() {
+        let _guard = config_env_lock().lock().unwrap();
+        let path = temp_config_path("reload-config-kitty-graphics");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, "[terminal]\nkitty_graphics = false\n").unwrap();
+        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
+
+        let mut app = test_app();
+        assert!(app.state.kitty_graphics_enabled);
+
+        let report = app.reload_config();
+
+        assert_eq!(report.status, crate::config::ConfigReloadStatus::Partial);
+        assert!(app.state.kitty_graphics_enabled);
+        assert_eq!(
+            report.diagnostics,
+            vec![
+                "terminal.kitty_graphics changes require restarting sy-term; kept current setting"
+                    .to_owned()
+            ]
+        );
+
+        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 }

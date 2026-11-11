@@ -65,6 +65,11 @@ impl App {
             return;
         }
 
+        if self.pane_exit_checkpoint_pending && !self.state.session_dirty {
+            self.session_save_deadline = None;
+            return;
+        }
+
         self.reap_finished_session_save();
         if self.session_save_thread.is_some() {
             self.session_save_deadline = Some(Instant::now() + Duration::from_millis(250));
@@ -76,7 +81,7 @@ impl App {
         self.session_save_deadline = None;
         let writer = self.session_writer.clone();
         match std::thread::Builder::new()
-            .name("herdr-session-save".into())
+            .name("sy-term-session-save".into())
             .spawn(move || run_session_save_job(job, &writer))
         {
             Ok(thread) => self.session_save_thread = Some(thread),
@@ -116,7 +121,7 @@ impl App {
     pub(crate) fn finish_checkpointed_pane_exit(&mut self) {
         if self.pane_exit_checkpoint_pending {
             self.state.session_dirty = false;
-            self.session_save_deadline = Some(Instant::now() + SESSION_SAVE_DEBOUNCE);
+            self.session_save_deadline = None;
         }
     }
 

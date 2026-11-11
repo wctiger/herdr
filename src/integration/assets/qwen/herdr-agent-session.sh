@@ -1,5 +1,5 @@
 #!/bin/sh
-# managed by herdr; reinstalling the integration replaces this file.
+# managed by sy-term; reinstalling the integration replaces this file.
 # HERDR_INTEGRATION_ID=qwen
 # HERDR_INTEGRATION_VERSION=2
 
@@ -10,7 +10,7 @@
 if [ -n "${HERDR_BIN_PATH:-}" ]; then
     [ -x "$HERDR_BIN_PATH" ] || exit 0
 else
-    command -v herdr >/dev/null 2>&1 || exit 0
+    command -v sy-term >/dev/null 2>&1 || exit 0
 fi
 command -v python3 >/dev/null 2>&1 || exit 0
 
@@ -27,7 +27,7 @@ try:
     source = payload.get("source")
     if not isinstance(session_id, str) or not session_id:
         raise ValueError
-    command = os.environ.get("HERDR_BIN_PATH") or "herdr"
+    command = os.environ.get("HERDR_BIN_PATH") or "sy-term"
     args = [
         command, "pane", "report-agent-session", os.environ["HERDR_PANE_ID"],
         "--source", "herdr:qwen", "--agent", "qwen",

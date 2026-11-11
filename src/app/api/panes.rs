@@ -71,7 +71,7 @@ impl App {
         let default_shell = self.state.default_shell.clone();
         let scrollback_limit_bytes = self.state.pane_scrollback_limit_bytes;
         let host_terminal_theme = self.state.host_terminal_theme;
-        let host_terminal_appearance = self.state.host_terminal_appearance;
+        let host_terminal_appearance = self.pane_host_terminal_appearance();
         let previous_focus = self.state.current_pane_focus_target();
         let Some(ws) = self.state.workspaces.get_mut(ws_idx) else {
             return encode_error(id, "pane_not_found", "pane not found");
@@ -3038,9 +3038,9 @@ mod tests {
         app.state.ensure_test_terminals();
         app.state.workspaces[0].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr-issue".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
+            checkout_path: "/repo/syt-issue".into(),
             is_linked_worktree: true,
         });
         app
@@ -3056,7 +3056,7 @@ mod tests {
                         .or_insert_with(|| {
                             crate::terminal::TerminalState::new(
                                 pane.attached_terminal_id.clone(),
-                                std::path::PathBuf::from("/herdr-test"),
+                                std::path::PathBuf::from("/syt-test"),
                             )
                         });
                 }
@@ -4668,7 +4668,7 @@ mod tests {
     fn pane_report_metadata_rejects_invalid_applies_to_source() {
         let (mut app, pane_id) = app_with_test_workspace();
         let mut params = metadata_params(pane_id);
-        params.applies_to_source = Some("herdr source".into());
+        params.applies_to_source = Some("sy-term source".into());
 
         let response = app.handle_pane_report_metadata("req".into(), params);
 

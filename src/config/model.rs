@@ -13,56 +13,12 @@ pub const MAX_TOAST_DELAY_SECONDS: u64 = 3600;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum UpdateChannelConfig {
-    #[default]
-    Stable,
-    Preview,
-}
-
-impl UpdateChannelConfig {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Stable => "stable",
-            Self::Preview => "preview",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Deserialize)]
-#[serde(default)]
-pub struct UpdateConfig {
-    pub channel: UpdateChannelConfig,
-    pub version_check: bool,
-    pub manifest_check: bool,
-}
-
-impl Default for UpdateConfig {
-    fn default() -> Self {
-        Self {
-            channel: default_update_channel(),
-            version_check: true,
-            manifest_check: true,
-        }
-    }
-}
-
-fn default_update_channel() -> UpdateChannelConfig {
-    default_update_channel_for_build(cfg!(windows), crate::build_info::is_preview())
-}
-
-fn default_update_channel_for_build(is_windows: bool, is_preview: bool) -> UpdateChannelConfig {
-    if is_windows && is_preview {
-        UpdateChannelConfig::Preview
-    } else {
-        UpdateChannelConfig::Stable
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
-#[serde(rename_all = "lowercase")]
 pub enum ToastDelivery {
     #[default]
     Off,
+    // "herdr" stays the canonical value for API compatibility; config files
+    // may use the product name instead.
+    #[serde(alias = "sy-term")]
     Herdr,
     Terminal,
     System,
@@ -316,13 +272,11 @@ pub struct Config {
     pub terminal: TerminalConfig,
     pub session: SessionConfig,
     pub server: ServerConfig,
-    pub update: UpdateConfig,
     pub keys: KeysConfig,
     pub ui: UiConfig,
     pub worktrees: WorktreesConfig,
     pub advanced: AdvancedConfig,
     pub experimental: ExperimentalConfig,
-    pub remote: RemoteConfig,
 }
 
 #[derive(Debug)]
@@ -1056,22 +1010,6 @@ pub struct AdvancedConfig {
     pub scrollback_limit_bytes: usize,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(default)]
-pub struct RemoteConfig {
-    /// Add keepalive fallbacks and private connection reuse for `herdr --remote`.
-    /// Set false to run plain ssh unchanged. Default: true.
-    pub manage_ssh_config: bool,
-}
-
-impl Default for RemoteConfig {
-    fn default() -> Self {
-        Self {
-            manage_ssh_config: true,
-        }
-    }
-}
-
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct ExperimentalConfig {
@@ -1190,7 +1128,7 @@ impl Default for KeysConfig {
 impl Default for WorktreesConfig {
     fn default() -> Self {
         Self {
-            directory: "~/.herdr/worktrees".into(),
+            directory: "~/.sy-term/worktrees".into(),
         }
     }
 }
@@ -1285,6 +1223,7 @@ impl<'de> Deserialize<'de> for ToastConfig {
             delivery: Option<ToastDelivery>,
             enabled: Option<bool>,
             delay_seconds: Option<u64>,
+            #[serde(alias = "sy-term")]
             herdr: HerdrToastConfig,
             clipboard: ClipboardToastConfig,
         }
@@ -1333,56 +1272,6 @@ impl Default for AdvancedConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn update_config_defaults_and_parses() {
-        let default_config = Config::default();
-        assert_eq!(default_config.update.channel, default_update_channel());
-        assert!(default_config.update.version_check);
-        assert!(default_config.update.manifest_check);
-
-        let toml = r#"
-[update]
-channel = "preview"
-version_check = false
-manifest_check = false
-"#;
-        let config: Config = toml::from_str(toml).unwrap();
-        assert_eq!(config.update.channel, UpdateChannelConfig::Preview);
-        assert_eq!(config.update.channel.as_str(), "preview");
-        assert!(!config.update.version_check);
-        assert!(!config.update.manifest_check);
-    }
-
-    #[test]
-    fn update_channel_default_follows_windows_build_identity() {
-        assert_eq!(
-            default_update_channel_for_build(true, true),
-            UpdateChannelConfig::Preview
-        );
-        assert_eq!(
-            default_update_channel_for_build(true, false),
-            UpdateChannelConfig::Stable
-        );
-        assert_eq!(
-            default_update_channel_for_build(false, true),
-            UpdateChannelConfig::Stable
-        );
-    }
-
-    #[test]
-    fn missing_update_channel_uses_build_default() {
-        let empty: Config = toml::from_str("").unwrap();
-        let without_update_channel: Config =
-            toml::from_str("[update]\nversion_check = false").unwrap();
-
-        assert_eq!(Config::default().update.channel, default_update_channel());
-        assert_eq!(empty.update.channel, default_update_channel());
-        assert_eq!(
-            without_update_channel.update.channel,
-            default_update_channel()
-        );
-    }
 
     #[test]
     fn terminal_default_shell_defaults_empty_and_parses() {
@@ -1570,14 +1459,14 @@ tab_bar_right_separator = " · "
     #[test]
     fn worktrees_directory_defaults_and_parses() {
         let default_config = Config::default();
-        assert_eq!(default_config.worktrees.directory, "~/.herdr/worktrees");
+        assert_eq!(default_config.worktrees.directory, "~/.sy-term/worktrees");
 
         let toml = r#"
 [worktrees]
-directory = "~/Projects/herdr-worktrees"
+directory = "~/Projects/syt-worktrees"
 "#;
         let config: Config = toml::from_str(toml).unwrap();
-        assert_eq!(config.worktrees.directory, "~/Projects/herdr-worktrees");
+        assert_eq!(config.worktrees.directory, "~/Projects/syt-worktrees");
     }
 
     #[test]
@@ -1877,7 +1766,7 @@ mouse_scroll_lines = 0
 delivery = "terminal"
 delay_seconds = 2
 
-[ui.toast.herdr]
+[ui.toast.sy-term]
 position = "top-left"
 
 [ui.toast.clipboard]

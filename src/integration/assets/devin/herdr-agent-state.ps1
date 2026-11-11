@@ -1,5 +1,5 @@
-# installed by herdr
-# managed by herdr; reinstalling or updating the integration overwrites this file.
+# installed by sy-term
+# managed by sy-term; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=devin
 # HERDR_INTEGRATION_VERSION=3
@@ -47,7 +47,7 @@ if ([string]::IsNullOrWhiteSpace($sessionId) -and $allowFallback) {
 if ([string]::IsNullOrWhiteSpace($sessionId)) { exit 0 }
 
 $seq = [DateTime]::UtcNow.Ticks
-$herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "herdr" } else { $env:HERDR_BIN_PATH }
+$herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "sy-term" } else { $env:HERDR_BIN_PATH }
 try {
     & $herdr pane report-agent-session $env:HERDR_PANE_ID --source herdr:devin --agent devin --seq $seq --agent-session-id $sessionId 2>$null | Out-Null
 } catch {

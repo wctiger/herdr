@@ -5,7 +5,7 @@ fn pane_close_only_removes_the_target_tab_when_other_tabs_exist() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -65,7 +65,7 @@ fn pane_close_removes_the_workspace_when_it_closes_the_last_pane() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -102,7 +102,7 @@ fn pane_run_read_and_wait_commands_work() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -172,7 +172,7 @@ fn wait_output_matches_recent_unwrapped_text() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -247,7 +247,7 @@ fn closing_pane_terminates_processes_inside_it() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -308,7 +308,7 @@ fn closing_workspace_terminates_processes_inside_it() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -361,7 +361,7 @@ fn workspace_ids_and_public_pane_ids_are_stable() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -514,7 +514,7 @@ fn pane_shell_gets_herdr_socket_and_pane_env() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -572,7 +572,7 @@ fn pane_agent_reports_accept_options_before_pane() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let socket_path = runtime_dir.join("herdr.sock");
+    let socket_path = runtime_dir.join("sy-term.sock");
 
     let herdr = spawn_herdr(&config_home, &runtime_dir, &socket_path);
     wait_for_socket(&socket_path, Duration::from_secs(5));
@@ -642,7 +642,7 @@ fn pane_read_rejects_invalid_value_with_usage_error() {
     // Invalid option values fail as CLI usage errors before any server
     // contact: exit 2 with the plain parser message, not the old
     // `Error: Custom { ... }` io::Error wrapper from main.
-    let socket_path = Path::new("/tmp/herdr-cli-invalid-values-no-server.sock");
+    let socket_path = Path::new("/tmp/syt-cli-invalid-values-no-server.sock");
 
     let read = run_cli(socket_path, &["pane", "read", "w1:p1", "--source", "bogus"]);
     assert_eq!(read.status.code(), Some(2));

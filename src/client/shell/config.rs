@@ -195,12 +195,7 @@ impl ClientShellConfig {
     }
 
     pub(crate) fn with_process_endpoint_preferences(self, socket_path: &std::path::Path) -> Self {
-        self.with_endpoint_preferences(
-            socket_path,
-            std::env::var(crate::remote::REMOTE_PREFERENCES_ENV_VAR)
-                .ok()
-                .as_deref(),
-        )
+        self.with_endpoint_preferences(socket_path, None)
     }
 
     pub(crate) fn with_endpoint_preferences(
@@ -523,7 +518,7 @@ mod tests {
     #[test]
     fn initial_surface_size_uses_persisted_endpoint_chrome() {
         let path = std::env::temp_dir().join(format!(
-            "herdr-initial-shell-preferences-{}.json",
+            "syt-initial-shell-preferences-{}.json",
             std::process::id()
         ));
         let _ = std::fs::remove_file(&path);

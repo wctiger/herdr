@@ -31,7 +31,7 @@ fn unique_test_dir() -> PathBuf {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     PathBuf::from(format!(
-        "/tmp/herdr-client-test-{}-{nanos}",
+        "/tmp/syt-client-test-{}-{nanos}",
         std::process::id()
     ))
 }
@@ -124,7 +124,7 @@ fn spawn_client_process_with_args_and_env(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_sy-term"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.args(args);
     cmd.env("HERDR_DISABLE_SOUND", "1");
@@ -185,7 +185,7 @@ fn spawn_server_with_config(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_sy-term"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
@@ -248,9 +248,9 @@ fn first_pane_id_in_workspace(socket_path: &PathBuf, workspace_id: &str) -> Stri
 
 fn app_dir_name() -> &'static str {
     if cfg!(debug_assertions) {
-        "herdr-dev"
+        "sy-term-dev"
     } else {
-        "herdr"
+        "sy-term"
     }
 }
 
@@ -264,8 +264,8 @@ fn client_connects_and_receives_pane_surface() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -288,8 +288,8 @@ fn direct_attach_initial_mouse_capture_follows_config() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
     let config_path = config_home.join(app_dir_name()).join("config.toml");
 
     let spawned_server = spawn_server_with_config(
@@ -410,13 +410,13 @@ fn client_sees_headless_startup_config_diagnostic() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let app_dir = if cfg!(debug_assertions) {
-        "herdr-dev"
+        "sy-term-dev"
     } else {
-        "herdr"
+        "sy-term"
     };
     fs::create_dir_all(config_home.join(app_dir)).unwrap();
     fs::write(
@@ -436,7 +436,7 @@ fn client_sees_headless_startup_config_diagnostic() {
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_sy-term"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", &config_home);
@@ -469,7 +469,7 @@ fn client_sees_headless_startup_config_diagnostic() {
     assert!(
         wait_until(Duration::from_secs(8), Duration::from_millis(20), || {
             let output = read_output(&output);
-            output.contains("config.toml") && output.contains("herdr config check")
+            output.contains("config.toml") && output.contains("sy-term config check")
         }),
         "client shell should render startup config diagnostic; output: {:?}",
         read_output(&output)
@@ -487,18 +487,18 @@ fn server_unreachable_shows_clear_error() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
 
-    fs::create_dir_all(config_home.join("herdr")).unwrap();
+    fs::create_dir_all(config_home.join("sy-term")).unwrap();
     fs::create_dir_all(&runtime_dir).unwrap();
     register_runtime_dir(&runtime_dir);
     fs::write(
-        config_home.join("herdr/config.toml"),
+        config_home.join("sy-term/config.toml"),
         "onboarding = false\n",
     )
     .unwrap();
 
-    let output = std::process::Command::new(env!("CARGO_BIN_EXE_herdr"))
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_sy-term"))
         .arg("client")
         .env("HERDR_DISABLE_SOUND", "1")
         .env("XDG_CONFIG_HOME", &config_home)
@@ -520,7 +520,7 @@ fn server_unreachable_shows_clear_error() {
         "stderr should mention connection failure: {stderr}"
     );
     assert!(
-        stderr.contains("Is herdr server running?"),
+        stderr.contains("Is sy-term server running?"),
         "stderr should include actionable guidance: {stderr}"
     );
     assert!(
@@ -539,8 +539,8 @@ fn server_crash_after_attach_causes_lost_connection_error() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let mut spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -575,7 +575,7 @@ fn server_crash_after_attach_causes_lost_connection_error() {
                         seen = true;
                         break;
                     }
-                    if output.to_lowercase().contains("herdr:") {
+                    if output.to_lowercase().contains("sy-term:") {
                         break;
                     }
                 }
@@ -723,8 +723,8 @@ fn sigwinch_refreshes_host_palette_without_resizing() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
     let server = spawn_server_with_config(
         &config_home,
         &runtime_dir,
@@ -889,7 +889,7 @@ fn attach_thin_client_with_config(
             attached = true;
             break;
         }
-        if out.to_lowercase().contains("herdr:") {
+        if out.to_lowercase().contains("sy-term:") {
             break;
         }
         thread::sleep(Duration::from_millis(30));
@@ -904,396 +904,13 @@ fn attach_thin_client_with_config(
 }
 
 #[test]
-fn federated_launch_opens_local_directly_while_saved_ssh_is_unavailable() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let _lock = test_lock();
-    for select_remote in [false, true] {
-        let base = unique_test_dir();
-        let config_home = base.join("config");
-        let runtime_dir = base.join("runtime");
-        let api_socket = runtime_dir.join("herdr.sock");
-        fs::create_dir_all(config_home.join(app_dir_name())).unwrap();
-        fs::write(
-            config_home.join(app_dir_name()).join("config.toml"),
-            "onboarding = false\n",
-        )
-        .unwrap();
-        let catalog_dir = runtime_dir
-            .join("state")
-            .join(app_dir_name())
-            .join("client");
-        fs::create_dir_all(&catalog_dir).unwrap();
-        let profile = "0123456789abcdef0123456789abcdef";
-        fs::write(catalog_dir.join("endpoints.json"), serde_json::json!({
-            "version": 1, "selected_profile": select_remote.then_some(profile),
-            "ssh": [{"id": profile, "label": "Unavailable remote", "target": "test-only", "session": "default", "enabled": true}],
-        }).to_string()).unwrap();
-        let bin = base.join("bin");
-        fs::create_dir_all(&bin).unwrap();
-        fs::write(bin.join("ssh"), "#!/bin/sh\nexit 255\n").unwrap();
-        fs::set_permissions(bin.join("ssh"), fs::Permissions::from_mode(0o700)).unwrap();
-        let path = format!(
-            "{}:{}",
-            bin.display(),
-            std::env::var("PATH").unwrap_or_default()
-        );
-
-        // Exercise both auto-start and a subsequent attach to the healthy Local server.
-        for args in [&[][..], &["client"][..]] {
-            let client = spawn_client_process_with_args_and_env(
-                &config_home,
-                &runtime_dir,
-                &api_socket,
-                args,
-                &[("PATH", &path)],
-            );
-            let output =
-                spawn_pty_drain(client._master.as_ref().unwrap().try_clone_reader().unwrap());
-            wait_for_socket(&api_socket, Duration::from_secs(10));
-            assert!(wait_until(
-                Duration::from_secs(10),
-                Duration::from_millis(20),
-                || { read_output(&output).contains("Local") }
-            ));
-            let mut input = client._master.as_ref().unwrap().take_writer().unwrap();
-            // Input is gated until Local's active surface is ready, and that readiness can lag
-            // the first rendered frame (the unavailable remote must not extend the wait). Retry
-            // the write instead of assuming a single write lands, matching the recovered-Local
-            // path below.
-            assert!(wait_until(Duration::from_secs(10), Duration::from_millis(20), || {
-                if read_output(&output).contains("LOCAL_DIRECT_READY") {
-                    return true;
-                }
-                input
-                    .write_all(b"printf 'LOCAL_%s\\n' DIRECT_READY\r")
-                    .unwrap();
-                false
-            }), "Local must accept input without waiting for SSH (remote selected: {select_remote}): {}", read_output(&output));
-            let text = read_output(&output);
-            assert!(!text.contains("Local: connecting"), "{text}");
-            assert!(!text.contains("Local: reconnecting"), "{text}");
-            drop(input);
-            drop(client);
-        }
-        let _ = send_json_request(
-            &api_socket,
-            r#"{"id":"stop","method":"server.stop","params":{}}"#,
-        );
-        cleanup_test_base(&base);
-    }
-}
-
-/// CI runners are heavily loaded, and a saved remote can need several connection
-/// attempts plus activation retries (each activation phase has its own deadline)
-/// before it is usable. These budgets only slow the failure path: every
-/// `wait_until` below returns as soon as its condition holds.
-const REMOTE_READY_TIMEOUT: Duration = Duration::from_secs(30);
-const REMOTE_INPUT_TIMEOUT: Duration = Duration::from_secs(20);
-
-#[test]
-fn federated_client_starts_without_local_and_survives_its_restart() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let _lock = test_lock();
-    let base = unique_test_dir();
-    let config_home = base.join("config");
-    let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
-    let remote_config = base.join("remote-config");
-    let remote_runtime = base.join("remote-runtime");
-    let remote_api = remote_runtime.join("herdr.sock");
-    let remote_client = remote_runtime.join("herdr-client.sock");
-    let mut remote_server =
-        spawn_server(&remote_config, &remote_runtime, &remote_api, &remote_client);
-    wait_for_socket(&remote_api, Duration::from_secs(10));
-    wait_for_socket(&remote_client, Duration::from_secs(10));
-    let created = send_json_request(
-        &remote_api,
-        &serde_json::json!({
-            "id": "remote-workspace", "method": "workspace.create",
-            "params": {"cwd": base, "focus": true, "label": "remote-ready"},
-        })
-        .to_string(),
-    );
-    let remote_pane = created["result"]["root_pane"]["pane_id"].as_str().unwrap();
-    send_pane_shell_command(&remote_api, remote_pane, "printf 'REMOTE_INITIAL_FRAME\\n'");
-
-    fs::create_dir_all(config_home.join(app_dir_name())).unwrap();
-    fs::write(
-        config_home.join(app_dir_name()).join("config.toml"),
-        "onboarding = false\n",
-    )
-    .unwrap();
-    let catalog_dir = runtime_dir
-        .join("state")
-        .join(app_dir_name())
-        .join("client");
-    fs::create_dir_all(&catalog_dir).unwrap();
-    let profile = "0123456789abcdef0123456789abcdef";
-    fs::write(catalog_dir.join("endpoints.json"), serde_json::json!({
-        "version": 1, "selected_profile": profile,
-        "ssh": [{"id": profile, "label": "Test remote", "target": "test-only", "session": "default", "enabled": true}],
-    }).to_string()).unwrap();
-
-    // The SSH executable is private to this client. Discovery and the stdio bridge run the real
-    // binary against a second disposable local server, never the developer's saved hosts.
-    let bin = base.join("bin");
-    fs::create_dir_all(&bin).unwrap();
-    fs::create_dir_all(base.join("home")).unwrap();
-    std::os::unix::fs::symlink(env!("CARGO_BIN_EXE_herdr"), bin.join("herdr")).unwrap();
-    let quote =
-        |path: &std::path::Path| format!("'{}'", path.display().to_string().replace('\'', "'\\''"));
-    let ssh_commands = base.join("ssh-commands");
-    let bridge_pid = base.join("bridge-pid");
-    fs::write(bin.join("ssh"), format!(
-        "#!/bin/sh\nexport HOME={} XDG_CONFIG_HOME={} XDG_RUNTIME_DIR={} HERDR_SOCKET_PATH={}\nunset HERDR_CLIENT_SOCKET_PATH HERDR_SESSION\ncontrol=; previous=; configuration=\nfor arg do\n  if [ \"$previous\" = -S ]; then control=$arg; fi\n  if [ \"$arg\" = -G ]; then configuration=yes; fi\n  previous=$arg; last=$arg\ndone\nif [ -n \"$configuration\" ]; then printf 'controlpath %s\\n' \"$control\"; exit 0; fi\nprintf '%s\\n' \"$last\" >> {}\ncase \"$last\" in *remote-client-bridge*) printf '%s\\n' \"$$\" > {};; esac\nexec /bin/sh -c \"$last\"\n",
-        quote(&base.join("home")), quote(&remote_config), quote(&remote_runtime), quote(&remote_api), quote(&ssh_commands), quote(&bridge_pid),
-    )).unwrap();
-    fs::set_permissions(bin.join("ssh"), fs::Permissions::from_mode(0o700)).unwrap();
-    let path = format!(
-        "{}:{}",
-        bin.display(),
-        std::env::var("PATH").unwrap_or_default()
-    );
-    let mut client = spawn_client_process_with_args_and_env(
-        &config_home,
-        &runtime_dir,
-        &api_socket,
-        &["client"],
-        &[("PATH", &path)],
-    );
-    let output = spawn_pty_drain(client._master.as_ref().unwrap().try_clone_reader().unwrap());
-    let screen_text = || {
-        let bytes = output
-            .lock()
-            .unwrap_or_else(|p| p.into_inner())
-            .bytes
-            .clone();
-        terminal_screen::text(&bytes, 80, 24)
-    };
-    assert!(
-        wait_until(REMOTE_READY_TIMEOUT, Duration::from_millis(20), || {
-            screen_text().contains("REMOTE_INITIAL_FRAME")
-        }),
-        "remote must be usable before Local exists: {}",
-        read_output(&output)
-    );
-    assert!(
-        fs::read_to_string(&ssh_commands)
-            .unwrap()
-            .contains("remote-client-bridge --idle-timeout-v1"),
-        "saved machine discovery must opt into the advertised bridge idle timeout"
-    );
-
-    let mut input = client._master.as_ref().unwrap().take_writer().unwrap();
-    send_pane_shell_command(&remote_api, remote_pane, "reconnect_survivor=ALIVE");
-    for cycle in 1..=3 {
-        let pid: libc::pid_t = fs::read_to_string(&bridge_pid)
-            .unwrap()
-            .trim()
-            .parse()
-            .unwrap();
-        assert_eq!(unsafe { libc::kill(pid, libc::SIGTERM) }, 0);
-        let marker = format!("REMOTE_RECONNECTED_{cycle}");
-        send_pane_shell_command(&remote_api, remote_pane, &format!("printf '{marker}\\n'"));
-        assert!(
-            wait_until(Duration::from_secs(15), Duration::from_millis(20), || {
-                screen_text().contains(&marker)
-            }),
-            "remote reconnect {cycle} must restore the visible screen without switching machines"
-        );
-        assert!(
-            wait_until(REMOTE_INPUT_TIMEOUT, Duration::from_millis(100), || {
-                if screen_text().contains(&format!("REMOTE_ALIVE_INPUT_{cycle}")) {
-                    return true;
-                }
-                write!(
-                    input,
-                    "printf 'REMOTE_%s_INPUT_{cycle}\\n' \"$reconnect_survivor\"\r"
-                )
-                .unwrap();
-                false
-            }),
-            "remote reconnect {cycle} must restore visible input and preserve the shell"
-        );
-    }
-
-    let mut local = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
-    wait_for_socket(&api_socket, Duration::from_secs(10));
-    let created = send_json_request(
-        &api_socket,
-        &serde_json::json!({
-            "id": "local-workspace", "method": "workspace.create",
-            "params": {"cwd": base, "focus": true, "label": "local-online"},
-        })
-        .to_string(),
-    );
-    assert_eq!(created["result"]["type"], "workspace_created");
-    assert!(wait_until(
-        Duration::from_secs(10),
-        Duration::from_millis(20),
-        || screen_text().contains("local-online")
-    ));
-
-    support::stop_spawned_herdr(&mut *local.child);
-    local.close_master();
-    drop(local);
-    assert!(
-        wait_until(REMOTE_INPUT_TIMEOUT, Duration::from_millis(20), || {
-            if screen_text().contains("REMOTE_SURVIVED") {
-                return true;
-            }
-            input
-                .write_all(b"printf 'REMOTE_%s\\n' SURVIVED\r")
-                .unwrap();
-            false
-        }),
-        "Local loss must not interrupt remote input or output: {}",
-        screen_text()
-    );
-    assert!(client.child.try_wait().unwrap().is_none());
-
-    let restarted = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
-    wait_for_socket(&api_socket, Duration::from_secs(10));
-    let created = send_json_request(
-        &api_socket,
-        &serde_json::json!({
-            "id": "local-returned", "method": "workspace.create",
-            "params": {"cwd": base, "focus": true, "label": "local-returned"},
-        })
-        .to_string(),
-    );
-    assert_eq!(created["result"]["type"], "workspace_created");
-    assert!(
-        wait_until(Duration::from_secs(12), Duration::from_millis(20), || {
-            screen_text().contains("local-returned")
-        }),
-        "Local must reconnect with fresh metadata"
-    );
-    input
-        .write_all(b"printf 'REMOTE_%s\\n' STILL_SELECTED\r")
-        .unwrap();
-    assert!(
-        wait_until(Duration::from_secs(8), Duration::from_millis(20), || {
-            screen_text().contains("REMOTE_STILL_SELECTED")
-        }),
-        "Local recovery must not steal selection: {}",
-        screen_text()
-    );
-    let local_pane = created["result"]["root_pane"]["pane_id"].as_str().unwrap();
-    send_pane_shell_command(
-        &api_socket,
-        local_pane,
-        "printf 'LOCAL_WHILE_REMOTE_STALLED\\n'",
-    );
-    {
-        struct ResumeBridge(libc::pid_t);
-        impl Drop for ResumeBridge {
-            fn drop(&mut self) {
-                unsafe { libc::kill(self.0, libc::SIGCONT) };
-            }
-        }
-        let bridge: libc::pid_t = fs::read_to_string(&bridge_pid)
-            .unwrap()
-            .trim()
-            .parse()
-            .unwrap();
-        assert_eq!(unsafe { libc::kill(bridge, libc::SIGSTOP) }, 0);
-        let _resume_bridge = ResumeBridge(bridge);
-        input
-            .write_all(&sidebar_row_click(&screen_text(), "local-returned"))
-            .unwrap();
-        assert!(
-            wait_until(Duration::from_secs(3), Duration::from_millis(20), || {
-                screen_text().contains("LOCAL_WHILE_REMOTE_STALLED")
-            }),
-            "one Local selection must not wait for the remote bridge: {}",
-            screen_text()
-        );
-        assert!(
-            wait_until(Duration::from_secs(3), Duration::from_millis(100), || {
-                if screen_text().contains("LOCAL_INPUT_WHILE_REMOTE_STALLED") {
-                    return true;
-                }
-                input
-                    .write_all(b"printf 'LOCAL_%s\\n' INPUT_WHILE_REMOTE_STALLED\r")
-                    .unwrap();
-                false
-            }),
-            "Local input must become usable while the remote bridge remains stopped"
-        );
-    }
-    input
-        .write_all(&sidebar_row_click(&screen_text(), "remote-ready"))
-        .unwrap();
-    assert!(wait_until(
-        Duration::from_secs(10),
-        Duration::from_millis(20),
-        || screen_text().contains("REMOTE_STILL_SELECTED")
-    ));
-
-    let watermark = output_len(&output);
-    support::stop_spawned_herdr(&mut *remote_server.child);
-    assert!(
-        wait_until(Duration::from_secs(10), Duration::from_millis(20), || {
-            read_output(&output)[watermark..].contains("reconnecting")
-        }),
-        "the selected remote must be marked disconnected"
-    );
-    let text = read_output(&output);
-    assert!(
-        text.rfind("\x1b[?1000h") > text.rfind("\x1b[?1000l"),
-        "losing the selected remote must keep host mouse reporting enabled"
-    );
-
-    send_pane_shell_command(
-        &api_socket,
-        local_pane,
-        "printf 'LOCAL_RECOVERED_SURFACE\\n'",
-    );
-    // Select the fresh workspace below Local's restored workspace.
-    // A fast shutdown may leave no saved workspace, so locate the actual row.
-    input
-        .write_all(&sidebar_row_click(&screen_text(), "local-returned"))
-        .unwrap();
-    assert!(
-        wait_until(Duration::from_secs(10), Duration::from_millis(20), || {
-            screen_text().contains("LOCAL_RECOVERED_SURFACE")
-        }),
-        "recovered Local must be selectable: {}",
-        screen_text()
-    );
-    // A coherent frame precedes the final host-effects fence; input stays gated until then.
-    assert!(
-        wait_until(REMOTE_INPUT_TIMEOUT, Duration::from_millis(100), || {
-            if screen_text().contains("LOCAL_INPUT_RECOVERED") {
-                return true;
-            }
-            input
-                .write_all(b"printf 'LOCAL_%s\\n' INPUT_RECOVERED\r")
-                .unwrap();
-            false
-        }),
-        "recovered Local must accept input: {}",
-        screen_text()
-    );
-    drop(input);
-    drop(client);
-    drop(restarted);
-    drop(remote_server);
-    cleanup_test_base(&base);
-}
-
-#[test]
 fn client_shell_detaches_restores_and_freshly_reattaches_to_current_state() {
     let _lock = test_lock();
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let mut server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -1467,8 +1084,8 @@ fn configured_window_title_tracks_all_tokens_and_focused_osc_only() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
     let (server, client, output) = attach_thin_client_with_config(
         &config_home,
         &runtime_dir,
@@ -1613,8 +1230,8 @@ fn assert_client_restores_terminal(trigger: impl FnOnce(&mut SpawnedHerdr, &mut 
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let (mut spawned_server, mut thin_client, pty_output) =
         attach_thin_client(&config_home, &runtime_dir, &api_socket, &client_socket);
@@ -1706,8 +1323,8 @@ fn client_exits_cleanly_when_terminal_and_transport_hang_up() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let mut spawned_server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -1765,8 +1382,8 @@ fn client_exits_cleanly_when_terminal_hangs_up() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned_server = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -1812,8 +1429,8 @@ fn client_receives_pane_surface_after_pane_output() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -1878,8 +1495,8 @@ fn unavailable_restored_pane_keeps_saved_cwd_in_server() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
     let data_dir = config_home.join(app_dir_name());
     let missing_cwd = base.join("missing-cwd-for-test");
     let missing_cwd = missing_cwd.to_str().expect("test cwd should be UTF-8");
@@ -1996,8 +1613,8 @@ fn graceful_shutdown_sends_server_shutdown_to_client() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     let mut spawned = spawn_server(&config_home, &runtime_dir, &api_socket, &client_socket);
     wait_for_socket(&api_socket, Duration::from_secs(10));
@@ -2053,8 +1670,8 @@ fn client_receives_notify_on_agent_state_change() {
     let base = unique_test_dir();
     let config_home = base.join("config");
     let runtime_dir = base.join("runtime");
-    let api_socket = runtime_dir.join("herdr.sock");
-    let client_socket = runtime_dir.join("herdr-client.sock");
+    let api_socket = runtime_dir.join("sy-term.sock");
+    let client_socket = runtime_dir.join("sy-term-client.sock");
 
     // Enable toast and sound in config so the server produces notifications.
     fs::create_dir_all(config_home.join(app_dir_name())).unwrap();
@@ -2077,7 +1694,7 @@ fn client_receives_notify_on_agent_state_change() {
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_sy-term"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", &config_home);

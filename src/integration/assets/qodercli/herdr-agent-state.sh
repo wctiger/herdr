@@ -1,5 +1,5 @@
 #!/bin/sh
-# managed by herdr; reinstalling the integration replaces this file.
+# managed by sy-term; reinstalling the integration replaces this file.
 # HERDR_INTEGRATION_ID=qodercli
 # HERDR_INTEGRATION_VERSION=4
 
@@ -23,7 +23,7 @@ try:
         raise ValueError
     subprocess.run(
         [
-            os.environ.get("HERDR_BIN_PATH") or "herdr",
+            os.environ.get("HERDR_BIN_PATH") or "sy-term",
             "pane", "report-agent-session", os.environ["HERDR_PANE_ID"],
             "--source", "herdr:qodercli", "--agent", "qodercli",
             "--agent-session-id", session_id, "--seq", str(time.time_ns()),

@@ -1,5 +1,5 @@
-// installed by herdr
-// managed by herdr; reinstalling or updating the integration overwrites this file.
+// installed by sy-term
+// managed by sy-term; reinstalling or updating the integration overwrites this file.
 // add custom hooks/plugins beside this file instead of editing it.
 // HERDR_INTEGRATION_ID=pi
 // HERDR_INTEGRATION_VERSION=9
@@ -227,7 +227,7 @@ export default function (pi) {
   });
 
   pi.on("session_start", async (event, ctx) => {
-    // TUI only: RPC/JSON/print modes are headless (no PTY herdr can display),
+    // TUI only: RPC/JSON/print modes are headless (no PTY sy-term can display),
     // and RPC still reports hasUI=true, so mode is the reliable gate.
     if (ctx?.mode !== "tui") {
       return;

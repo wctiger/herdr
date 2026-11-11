@@ -275,39 +275,12 @@ fn group(name: &'static str, about: &'static str, leaves: &[Leaf]) -> Command {
 
 pub(crate) fn command() -> Command {
     Command::new("plugin")
-        .about("Install and run workflow plugins")
+        .about("Link and run local workflow plugins")
         .subcommand_required(true)
-        .subcommand(
-            Command::new("install")
-                .about("Install a plugin from GitHub")
-                .arg(
-                    Arg::new("source")
-                        .value_name("OWNER/REPO[/SUBDIR]")
-                        .required(true),
-                )
-                .arg(Arg::new("ref").long("ref").value_name("REF"))
-                .arg(
-                    Arg::new("yes")
-                        .short('y')
-                        .long("yes")
-                        .action(ArgAction::SetTrue),
-                ),
-        )
         .subcommand(
             Command::new("uninstall")
                 .about("Uninstall a plugin")
                 .arg(Arg::new("plugin").value_name("PLUGIN").required(true)),
-        )
-        .subcommand(
-            Command::new("update")
-                .about("Update GitHub-installed plugins")
-                .arg(Arg::new("plugins").value_name("PLUGIN").num_args(0..))
-                .arg(
-                    Arg::new("yes")
-                        .short('y')
-                        .long("yes")
-                        .action(ArgAction::SetTrue),
-                ),
         )
         .subcommands(DIRECT.iter().map(Leaf::command))
         .subcommand(
@@ -419,22 +392,6 @@ mod tests {
         };
         assert!(json);
         assert_eq!(params.plugin_id.as_deref(), Some(""));
-    }
-
-    #[test]
-    fn plugin_clap_preserves_remote_path_policy() {
-        crate::cli::target::with_test_client(crate::api::client::ApiClient::local(), || {
-            assert!(matches!(
-                parse(&["link", "relative/path"]),
-                Err(ParseError::Io(_))
-            ));
-            for path in ["/remote/plugin", "C:\\remote\\plugin"] {
-                let (Method::PluginLink(params), _) = parse(&["link", path]).unwrap() else {
-                    panic!("link request");
-                };
-                assert_eq!(params.path, path);
-            }
-        });
     }
 
     #[test]

@@ -1,4 +1,4 @@
-"""Hermes plugin installed by Herdr to report resumable session identity."""
+"""Hermes plugin installed by sy-term to report resumable session identity."""
 
 # HERDR_INTEGRATION_ID=hermes
 # HERDR_INTEGRATION_VERSION=5
@@ -25,7 +25,7 @@ def _send_session(session_id: str, start_source: str) -> None:
     if pane_id is None:
         return
     command = [
-        os.environ.get("HERDR_BIN_PATH") or "herdr",
+        os.environ.get("HERDR_BIN_PATH") or "sy-term",
         "pane",
         "report-agent-session",
         pane_id,

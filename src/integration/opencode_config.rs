@@ -295,7 +295,7 @@ mod tests {
         // Apply the limit only to a child, after seeding the existing preferences.
         // Ignoring SIGXFSZ makes the kernel return EFBIG instead of killing it.
         let output = std::process::Command::new("bash")
-            .args(["-c", "trap '' XFSZ; ulimit -f 0; exec \"$@\"", "herdr-test"])
+            .args(["-c", "trap '' XFSZ; ulimit -f 0; exec \"$@\"", "syt-test"])
             .arg(std::env::current_exe().unwrap())
             .args([
                 "--exact",

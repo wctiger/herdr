@@ -169,7 +169,7 @@ mod tests {
             .unwrap_or(0);
         std::env::temp_dir()
             .join(format!(
-                "herdr-registry-{name}-{}-{nanos}",
+                "syt-registry-{name}-{}-{nanos}",
                 std::process::id()
             ))
             .join("plugins.json")
@@ -258,7 +258,7 @@ mod tests {
             subdir: Some("worktree-bootstrap".into()),
             requested_ref: Some("main".into()),
             resolved_commit: Some("abc123".into()),
-            managed_path: Some("/tmp/herdr/plugins/github/example.reload".into()),
+            managed_path: Some("/tmp/sy-term/plugins/github/example.reload".into()),
             installed_unix_ms: Some(42),
         };
 
@@ -301,9 +301,9 @@ mod tests {
     fn save_preserves_relative_registry_symlink() {
         let path = temp_registry_path("relative-symlink");
         let root = path.parent().unwrap();
-        let target = root.join("dotfiles/herdr/plugins.json");
+        let target = root.join("dotfiles/sy-term/plugins.json");
         save_to_path(&target, &[sample_plugin("example.first")]).unwrap();
-        std::os::unix::fs::symlink("dotfiles/herdr/plugins.json", &path).unwrap();
+        std::os::unix::fs::symlink("dotfiles/sy-term/plugins.json", &path).unwrap();
 
         let result = save_to_path(&path, &[sample_plugin("example.second")]);
         let preserved = std::fs::symlink_metadata(&path)
@@ -317,7 +317,10 @@ mod tests {
 
         result.unwrap();
         assert!(preserved, "saving the registry must preserve its symlink");
-        assert_eq!(link_text.unwrap(), Path::new("dotfiles/herdr/plugins.json"));
+        assert_eq!(
+            link_text.unwrap(),
+            Path::new("dotfiles/sy-term/plugins.json")
+        );
         assert!(same_content);
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].plugin_id, "example.second");
@@ -329,17 +332,17 @@ mod tests {
         let path = temp_registry_path("dangling-chain");
         let root = path.parent().unwrap();
         let middle = root.join("links/registry.json");
-        let target = root.join("dotfiles/herdr/plugins.json");
+        let target = root.join("dotfiles/sy-term/plugins.json");
         std::fs::create_dir_all(middle.parent().unwrap()).unwrap();
         std::os::unix::fs::symlink(&middle, &path).unwrap();
-        std::os::unix::fs::symlink("../dotfiles/herdr/plugins.json", &middle).unwrap();
+        std::os::unix::fs::symlink("../dotfiles/sy-term/plugins.json", &middle).unwrap();
 
         save_to_path(&path, &[sample_plugin("example.new")]).unwrap();
 
         assert_eq!(std::fs::read_link(&path).unwrap(), middle);
         assert_eq!(
             std::fs::read_link(&middle).unwrap(),
-            Path::new("../dotfiles/herdr/plugins.json")
+            Path::new("../dotfiles/sy-term/plugins.json")
         );
         assert_eq!(load_from_path(&target)[0].plugin_id, "example.new");
         assert!(!target.with_extension("json.tmp").exists());

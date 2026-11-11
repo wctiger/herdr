@@ -25,33 +25,68 @@ pub(crate) use power::monitor_host_power;
 
 static ALLOW_UNELEVATED_CLIENTS: OnceLock<bool> = OnceLock::new();
 
+#[cfg(test)]
+pub(crate) struct PrivateLocalListener {
+    listener: interprocess::os::windows::named_pipe::PipeListener<
+        interprocess::os::windows::named_pipe::pipe_mode::Bytes,
+        interprocess::os::windows::named_pipe::pipe_mode::Bytes,
+    >,
+    stream_nonblocking: std::sync::atomic::AtomicBool,
+}
+
+#[cfg(test)]
+impl PrivateLocalListener {
+    pub(crate) fn bind(path: &std::path::Path) -> std::io::Result<Self> {
+        use interprocess::os::windows::{
+            named_pipe::PipeListenerOptions, security_descriptor::SecurityDescriptor,
+        };
+
+        let sddl = widestring::U16CString::from_str("D:P(A;;GA;;;SY)(A;;GA;;;OW)")
+            .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
+        let security_descriptor = SecurityDescriptor::deserialize(&sddl)?;
+        // The default 512-byte buffers serialize busy SSH output behind reader polling.
+        let listener = PipeListenerOptions::new()
+            .path(format!(r"\\.\pipe\{}", path.to_string_lossy()))
+            .input_buffer_size_hint(64 * 1024)
+            .output_buffer_size_hint(64 * 1024)
+            .security_descriptor(Some(security_descriptor))
+            .create_duplex()?;
+        Ok(Self {
+            listener,
+            stream_nonblocking: std::sync::atomic::AtomicBool::new(false),
+        })
+    }
+
+    pub(crate) fn accept(&self) -> std::io::Result<crate::ipc::LocalStream> {
+        let stream = self.listener.accept()?;
+        stream.set_nonblocking(self.stream_nonblocking.load(AtomicOrdering::Acquire))?;
+        Ok(crate::ipc::LocalStream::NamedPipe(stream.into()))
+    }
+
+    pub(crate) fn set_nonblocking(
+        &self,
+        mode: interprocess::local_socket::ListenerNonblockingMode,
+    ) -> std::io::Result<()> {
+        self.listener.set_nonblocking(mode.accept_nonblocking())?;
+        self.stream_nonblocking
+            .store(mode.stream_nonblocking(), AtomicOrdering::Release);
+        Ok(())
+    }
+}
+
+#[cfg(test)]
 pub(crate) struct ChildPipe(std::fs::File);
 
+#[cfg(test)]
 impl ChildPipe {
     pub(crate) fn new_reader(pipe: impl Into<OwnedHandle>) -> std::io::Result<Self> {
         // Rust's stdout/stderr handles lack permission to change pipe mode. Peek before
         // reading instead; each pipe has exactly one reader.
         Ok(Self(std::fs::File::from(pipe.into())))
     }
-
-    pub(crate) fn new_writer(pipe: impl Into<OwnedHandle>) -> std::io::Result<Self> {
-        use windows_sys::Win32::System::Pipes::{SetNamedPipeHandleState, PIPE_NOWAIT};
-        let file = std::fs::File::from(pipe.into());
-        let mode = PIPE_NOWAIT;
-        if unsafe { SetNamedPipeHandleState(file.as_raw_handle(), &mode, null_mut(), null_mut()) }
-            == 0
-        {
-            return Err(std::io::Error::last_os_error());
-        }
-        Ok(Self(file))
-    }
-
-    pub(crate) fn wait(&self, _writing: bool) -> std::io::Result<()> {
-        std::thread::sleep(Duration::from_millis(2));
-        Ok(())
-    }
 }
 
+#[cfg(test)]
 impl std::io::Read for ChildPipe {
     fn read(&mut self, buffer: &mut [u8]) -> std::io::Result<usize> {
         use windows_sys::Win32::System::Pipes::PeekNamedPipe;
@@ -85,6 +120,7 @@ impl std::io::Read for ChildPipe {
     }
 }
 
+#[cfg(test)]
 impl std::io::Write for ChildPipe {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
         match self.0.write(buffer) {
@@ -228,7 +264,7 @@ pub(crate) fn local_server_connection_error(error: std::io::Error) -> std::io::E
         error.kind(),
         format!(
             "For an elevated server, use an administrator terminal. Sharing with ordinary \
-             clients requires stopping it there and restarting its `herdr server` command \
+             clients requires stopping it there and restarting its `sy-term server` command \
              with --allow-unelevated-clients (closes panes). {error}"
         ),
     )
@@ -265,25 +301,6 @@ pub(crate) fn host_shutdown_in_progress() -> bool {
     unsafe { GetSystemMetrics(SM_SHUTTINGDOWN) != 0 }
 }
 
-pub(crate) struct RemoteBridgeWake;
-
-impl RemoteBridgeWake {
-    pub(crate) fn new() -> std::io::Result<Self> {
-        Ok(Self)
-    }
-
-    pub(crate) fn cancel(&self) -> std::io::Result<()> {
-        // The named-pipe reader checks its cancellation flag between peeks.
-        Ok(())
-    }
-
-    pub(crate) fn wait(&self, _stream: &crate::ipc::LocalStream) -> std::io::Result<()> {
-        // Synchronous named pipes still use peek-before-read polling on Windows.
-        std::thread::sleep(Duration::from_millis(1));
-        Ok(())
-    }
-}
-
 pub(crate) fn wait_client_stream_readable(
     _stream: &crate::ipc::LocalStream,
     timeout: Duration,
@@ -292,57 +309,6 @@ pub(crate) fn wait_client_stream_readable(
     // cancellation flag between polls, including when a frame arrives in several fragments.
     std::thread::sleep(timeout.min(Duration::from_millis(2)));
     Ok(())
-}
-
-pub(crate) fn forward_remote_bridge_stdio(
-    stream: crate::ipc::LocalStream,
-    _idle_timeout: bool,
-) -> std::io::Result<()> {
-    use interprocess::TryClone as _;
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    let mut stdout = std::io::stdout().lock();
-    let mut socket_to_stdout = stream.try_clone()?;
-    let mut stdin_to_socket = stream;
-    let upload_done = Arc::new(AtomicBool::new(false));
-    let upload_done_worker = Arc::clone(&upload_done);
-    let _upload = std::thread::spawn(move || {
-        let mut stdin = std::io::stdin();
-        let _ = copy_flush(&mut stdin, &mut stdin_to_socket);
-        upload_done_worker.store(true, Ordering::Release);
-    });
-
-    let mut buffer = [0_u8; 16 * 1024];
-    while !upload_done.load(Ordering::Acquire) {
-        match crate::ipc::poll_local_stream_read_count(&mut socket_to_stdout, &mut buffer)? {
-            crate::ipc::LocalStreamReadCount::Data(read) => {
-                std::io::Write::write_all(&mut stdout, &buffer[..read])?;
-                std::io::Write::flush(&mut stdout)?;
-            }
-            crate::ipc::LocalStreamReadCount::Pending => {
-                std::thread::sleep(Duration::from_millis(1));
-            }
-            crate::ipc::LocalStreamReadCount::Closed => break,
-        }
-    }
-    Ok(())
-}
-
-fn copy_flush<R: std::io::Read, W: std::io::Write>(
-    reader: &mut R,
-    writer: &mut W,
-) -> std::io::Result<()> {
-    let mut buffer = [0_u8; 16 * 1024];
-    loop {
-        let read = match reader.read(&mut buffer) {
-            Ok(0) => return Ok(()),
-            Ok(read) => read,
-            Err(err) if err.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(err) => return Err(err),
-        };
-        writer.write_all(&buffer[..read])?;
-        writer.flush()?;
-    }
 }
 
 pub(super) fn read_terminal_grid_size() -> std::io::Result<(u16, u16)> {
@@ -552,7 +518,6 @@ use windows_sys::{
         },
         Globalization::{CompareStringOrdinal, CSTR_EQUAL, CSTR_GREATER_THAN, CSTR_LESS_THAN},
         Security::SECURITY_ATTRIBUTES,
-        Storage::FileSystem::CreateDirectoryW,
         System::{
             Console::GetConsoleWindow,
             DataExchange::{
@@ -629,7 +594,7 @@ thread_local! {
 
 /// Native processor architecture of the Windows host as an
 /// `IMAGE_FILE_MACHINE_*` value. `IsWow64Process2` reports the native machine
-/// even when an x64 Herdr runs under emulation on Windows ARM64, which the
+/// even when an x64 sy-term runs under emulation on Windows ARM64, which the
 /// build target alone cannot reveal.
 pub(crate) fn native_machine_type() -> u16 {
     let mut process_machine = 0u16;
@@ -794,67 +759,6 @@ static PROCESS_RUNTIME_MARKER_CACHE: LazyLock<Mutex<HashMap<u32, CachedProcessRu
 static GIT_BASH_PROCESS_CACHE: LazyLock<Mutex<HashMap<u32, CachedGitBashProcess>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub(crate) fn remote_ssh_config_paths() -> super::RemoteSshConfigPaths {
-    super::RemoteSshConfigPaths {
-        user_config: std::env::var_os("USERPROFILE")
-            .map(PathBuf::from)
-            .map(|home| home.join(".ssh").join("config")),
-        system_config: std::env::var_os("PROGRAMDATA")
-            .map(PathBuf::from)
-            .map(|dir| dir.join("ssh").join("ssh_config")),
-        multiplexing: false,
-    }
-}
-
-pub(crate) fn create_remote_ssh_config_dir(_control_socket_name: &str) -> std::io::Result<PathBuf> {
-    let base = remote_private_temp_base();
-    std::fs::create_dir_all(&base)?;
-    for attempt in 0..100 {
-        let dir = base.join(format!("ssh-{}-{attempt}", std::process::id()));
-        match create_remote_private_dir(&dir) {
-            Ok(()) => return Ok(dir),
-            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => continue,
-            Err(err) => return Err(err),
-        }
-    }
-    Err(std::io::Error::new(
-        std::io::ErrorKind::AlreadyExists,
-        "failed to create private herdr ssh config directory",
-    ))
-}
-
-pub(crate) fn create_remote_ssh_config_file(
-    path: &std::path::Path,
-) -> std::io::Result<std::fs::File> {
-    std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
-}
-
-pub(crate) fn create_remote_private_dir(path: &std::path::Path) -> std::io::Result<()> {
-    use interprocess::os::windows::security_descriptor::{
-        AsSecurityDescriptorExt as _, SecurityDescriptor,
-    };
-    use widestring::U16CString;
-
-    let sddl = U16CString::from_str("D:P(A;OICI;GA;;;SY)(A;OICI;GA;;;OW)")
-        .map_err(|err| std::io::Error::new(std::io::ErrorKind::InvalidInput, err))?;
-    let security_descriptor = SecurityDescriptor::deserialize(&sddl)?;
-    let mut security_attributes = SECURITY_ATTRIBUTES {
-        nLength: u32::try_from(size_of::<SECURITY_ATTRIBUTES>()).unwrap_or(u32::MAX),
-        lpSecurityDescriptor: null_mut(),
-        bInheritHandle: 0,
-    };
-    security_descriptor.write_to_security_attributes(&mut security_attributes);
-    let path = extended_length_path(path)?;
-    if unsafe { CreateDirectoryW(path.as_ptr(), &security_attributes) } != 0 {
-        Ok(())
-    } else {
-        Err(std::io::Error::last_os_error())
-    }
-}
-
 fn extended_length_path(path: &std::path::Path) -> std::io::Result<Vec<u16>> {
     use std::os::windows::ffi::OsStrExt as _;
 
@@ -874,29 +778,6 @@ fn extended_length_path(path: &std::path::Path) -> std::io::Result<Vec<u16>> {
     };
     extended.push(0);
     Ok(extended)
-}
-
-pub(crate) fn remote_private_temp_base() -> PathBuf {
-    crate::config::state_dir().join("remote")
-}
-
-pub(crate) fn remote_bridge_endpoint_path(_readable_name: &str, short_name: &str) -> PathBuf {
-    remote_private_temp_base().join(short_name)
-}
-
-pub(crate) fn remote_reattach_program(program: &str) -> String {
-    let path = std::env::current_exe()
-        .ok()
-        .filter(|path| path.is_absolute())
-        .unwrap_or_else(|| PathBuf::from(program));
-    format!(
-        "& {}",
-        remote_reattach_argument(&path.display().to_string())
-    )
-}
-
-pub(crate) fn remote_reattach_argument(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "''"))
 }
 
 /// Encode native or targeted semantic Win32 input for a compatible ConPTY destination.
@@ -3118,7 +2999,7 @@ fn read_unicode_string(process: HANDLE, unicode: UNICODE_STRING) -> Option<Strin
 
 // Prefix-mode ASCII input source support (see `switch_ascii_input_source_in_prefix`).
 //
-// Windows IMEs live in the terminal-emulator process, not in herdr. Empirically:
+// Windows IMEs live in the terminal-emulator process, not in sy-term. Empirically:
 //   - `WM_IME_CONTROL` / `IMC_GETOPENSTATUS` reads whether the IME is open
 //     (composing native characters) reliably across the process boundary (this
 //     is what kren-select uses), so we detect state with it. The read goes
@@ -3162,7 +3043,7 @@ const IME_STATUS_READ_TIMEOUT_MS: u32 = 200;
 /// Reads the IME open status (`IMC_GETOPENSTATUS`) with a bounded timeout.
 ///
 /// `WM_IME_CONTROL` crosses into the terminal-emulator process, and a plain
-/// `SendMessageW` would block herdr's client thread until that process responds
+/// `SendMessageW` would block sy-term's client thread until that process responds
 /// (indefinitely if it is hung). `SendMessageTimeoutW` with `SMTO_ABORTIFHUNG`
 /// caps the wait; on timeout or failure this returns `None` and callers leave
 /// the IME untouched rather than blocking or guessing.
@@ -3440,7 +3321,7 @@ mod tests {
         use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
         use windows_sys::Win32::Storage::FileSystem::PIPE_ACCESS_DUPLEX;
         use windows_sys::Win32::System::Pipes::CreateNamedPipeW;
-        let path = std::path::PathBuf::from(format!("herdr-busy-{}", std::process::id()));
+        let path = std::path::PathBuf::from(format!("syt-busy-{}", std::process::id()));
         let name = super::wide_null(&format!(r"\\.\pipe\{}", path.display()));
         let handle = unsafe {
             CreateNamedPipeW(
@@ -3503,8 +3384,7 @@ mod tests {
         };
         use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
-        let path =
-            std::env::temp_dir().join(format!("herdr-user-pipe-{}.sock", std::process::id()));
+        let path = std::env::temp_dir().join(format!("syt-user-pipe-{}.sock", std::process::id()));
         let listener = crate::ipc::bind_local_listener(&path).unwrap();
         let mut raw_token = std::ptr::null_mut();
         assert_ne!(
@@ -3685,7 +3565,7 @@ mod tests {
     #[test]
     fn windows_plugin_runtime_path_keeps_extended_path_when_normal_form_is_not_equivalent() {
         let path = std::path::PathBuf::from(format!(
-            r"\\?\C:\herdr-missing-plugin-runtime-path-{}",
+            r"\\?\C:\sy-term-missing-plugin-runtime-path-{}",
             std::process::id()
         ));
         assert_eq!(super::plugin_runtime_path_platform(&path), path);
@@ -3735,21 +3615,6 @@ mod tests {
             super::prepare_paste_text_for_pty_platform("one\ntwo\r\nthree\rfour".to_owned()),
             "one\r\ntwo\r\nthree\rfour"
         );
-    }
-
-    #[test]
-    fn private_remote_directory_supports_long_paths() {
-        let base = std::env::temp_dir().join(format!(
-            "herdr-private-remote-dir-test-{}",
-            std::process::id()
-        ));
-        fs::create_dir_all(&base).expect("create test base");
-        let private = base.join("x".repeat(240));
-
-        super::create_remote_private_dir(&private).expect("create private long-path directory");
-        fs::write(private.join("probe"), b"ok").expect("write inherited private file");
-
-        fs::remove_dir_all(base).expect("remove test directory");
     }
 
     #[test]
@@ -4059,7 +3924,7 @@ mod tests {
         }
 
         let base = std::env::temp_dir().join(format!(
-            "herdr-wmi-daemon-test-{}-{}",
+            "syt-wmi-daemon-test-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -4242,10 +4107,8 @@ mod tests {
 
     #[test]
     fn detached_custom_command_preserves_quoted_command_tail() {
-        let path = std::env::temp_dir().join(format!(
-            "herdr-raw-command-quotes-{}.txt",
-            std::process::id()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("syt-raw-command-quotes-{}.txt", std::process::id()));
         let command = format!(r#"echo "hi" > "{}""#, path.display());
 
         let status = super::detached_custom_command_process_platform(&command)
@@ -4261,9 +4124,10 @@ mod tests {
 
     #[test]
     fn windows_process_cwd_reads_normalized_child_launch_directory() {
+        use std::io::{Read, Write};
         use std::path::PathBuf;
 
-        let name = format!("Herdr-Cwd-Case-{}", std::process::id());
+        let name = format!("syt-Cwd-Case-{}", std::process::id());
         let cwd = std::env::temp_dir().join(&name);
         fs::create_dir_all(&cwd).expect("create cwd fixture");
         let cwd = super::normalize_cwd_for_launch_platform(&cwd);
@@ -4282,37 +4146,66 @@ mod tests {
                 .args(["/D", "/Q", "/K"])
                 .current_dir(super::normalize_cwd_for_launch_platform(&launch_cwd))
                 .stdin(Stdio::piped())
-                .stdout(Stdio::null())
+                .stdout(Stdio::piped())
                 .stderr(Stdio::null())
                 .spawn()
                 .expect("spawn cmd");
-            let observe = |expected: &PathBuf| {
-                let deadline = Instant::now() + Duration::from_secs(5);
+            let mut stdout = super::ChildPipe::new_reader(child.stdout.take().unwrap())
+                .expect("read cmd output");
+            // The inherited cwd is readable before cmd is ready to execute input.
+            let mut wait_for = |marker: &[u8]| {
+                let deadline = Instant::now() + Duration::from_secs(15);
+                let mut output = Vec::new();
                 loop {
-                    let observed = super::process_cwd(child.id());
-                    if observed.as_ref() == Some(expected) || Instant::now() >= deadline {
-                        break observed;
+                    let mut buffer = [0; 1024];
+                    match stdout.read(&mut buffer) {
+                        Ok(0) => break,
+                        Ok(len) => {
+                            output.extend_from_slice(&buffer[..len]);
+                            if output.windows(marker.len()).any(|part| part == marker) {
+                                return Ok(());
+                            }
+                        }
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+                        Err(error) => return Err(error.to_string()),
+                    }
+                    if Instant::now() >= deadline {
+                        break;
                     }
                     thread::sleep(Duration::from_millis(20));
                 }
+                Err(format!(
+                    "cmd did not acknowledge {}: {}",
+                    String::from_utf8_lossy(marker),
+                    String::from_utf8_lossy(&output)
+                ))
             };
-            let initial = observe(&cwd);
-            use std::io::Write;
+            writeln!(child.stdin.as_ref().unwrap(), "echo sy-term-cwd-ready\r")
+                .expect("check cmd readiness");
+            let ready = wait_for(b"sy-term-cwd-ready");
+            let initial = super::process_cwd(child.id());
             writeln!(
                 child.stdin.as_ref().unwrap(),
-                "cd /d \"{}\"\r",
+                "cd /d \"{}\" 2>&1 && echo sy-term-cwd-changed\r",
                 changed.display()
             )
             .expect("change cmd cwd");
-            let after_cd = observe(&changed);
+            let cd_completed = wait_for(b"sy-term-cwd-changed");
+            let after_cd = super::process_cwd(child.id());
             let pane_cwd = super::pane_process_cwd(child.id());
             let _ = child.kill();
             let _ = child.wait();
-            observations.push((shell, initial, after_cd, pane_cwd));
+            observations.push((shell, ready, initial, cd_completed, after_cd, pane_cwd));
         }
         let _ = fs::remove_dir_all(&cwd);
-        for (shell, initial, after_cd, pane_cwd) in observations {
+        for (shell, ready, initial, cd_completed, after_cd, pane_cwd) in observations {
+            assert!(ready.is_ok(), "{} readiness: {ready:?}", shell.display());
             assert_eq!(initial, Some(cwd.clone()), "{} launch cwd", shell.display());
+            assert!(
+                cd_completed.is_ok(),
+                "{} cd completion: {cd_completed:?}",
+                shell.display()
+            );
             assert_eq!(
                 after_cd,
                 Some(changed.clone()),
@@ -5132,7 +5025,7 @@ mod tests {
                 "node.exe",
                 &[
                     "node.exe",
-                    "C:\\Users\\herdr\\AppData\\Roaming\\npm\\node_modules\\codex\\bin\\codex.js",
+                    "C:\\Users\\sy-term\\AppData\\Roaming\\npm\\node_modules\\codex\\bin\\codex.js",
                 ],
             ),
         ];
@@ -5156,7 +5049,7 @@ mod tests {
                     "/D",
                     "/S",
                     "/C",
-                    "C:\\Users\\herdr\\AppData\\Roaming\\npm\\codex.cmd --model gpt-5",
+                    "C:\\Users\\sy-term\\AppData\\Roaming\\npm\\codex.cmd --model gpt-5",
                 ],
             ),
         ];
@@ -5177,14 +5070,14 @@ mod tests {
                 "node.exe",
                 &[
                     "node.exe",
-                    "C:\\Users\\herdr\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\bin\\codex.js",
+                    "C:\\Users\\sy-term\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\bin\\codex.js",
                 ],
             ),
             test_entry(
                 30,
                 20,
                 "codex.exe",
-                &["C:\\Users\\herdr\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin\\codex.exe"],
+                &["C:\\Users\\sy-term\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex\\node_modules\\@openai\\codex-win32-x64\\vendor\\x86_64-pc-windows-msvc\\bin\\codex.exe"],
             ),
             test_entry(40, 30, "node_repl.exe", &["node_repl.exe"]),
             test_entry(
@@ -5359,7 +5252,7 @@ mod tests {
 
     #[test]
     fn scrollback_editor_argv_uses_editor_env_and_appends_path() {
-        let path = std::path::Path::new(r"C:\Users\User\AppData\Local\Temp\herdr scrollback.txt");
+        let path = std::path::Path::new(r"C:\Users\User\AppData\Local\Temp\sy-term scrollback.txt");
         let argv = super::scrollback_editor_argv_with_env(
             path,
             Some(r#""C:\Program Files\Microsoft VS Code\Code.exe" --wait"#),
@@ -5373,7 +5266,7 @@ mod tests {
 
     #[test]
     fn scrollback_editor_argv_falls_back_to_notepad() {
-        let path = std::path::Path::new(r"C:\Temp\herdr-scrollback.txt");
+        let path = std::path::Path::new(r"C:\Temp\sy-term-scrollback.txt");
         let argv = super::scrollback_editor_argv_with_env(path, None).unwrap();
 
         assert_eq!(
@@ -5464,7 +5357,7 @@ mod tests {
     #[test]
     fn pane_runtime_marker_is_added_only_to_git_bash_environment() {
         let root = std::env::temp_dir().join(format!(
-            "herdr-git-bash-test-{}",
+            "syt-git-bash-test-{}",
             super::next_pane_runtime_marker()
         ));
         fs::create_dir_all(root.join("bin")).expect("create Git Bash bin fixture");

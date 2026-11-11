@@ -23,7 +23,6 @@ pub(crate) mod agent;
 mod api;
 mod completion;
 mod integration;
-mod machine;
 pub(crate) mod notification;
 pub(crate) mod pane;
 pub(crate) mod plugin;
@@ -34,25 +33,28 @@ mod server_not_running;
 mod spec;
 mod status;
 pub(crate) mod tab;
-mod target;
 mod title;
 mod workspace;
 pub(crate) mod workspace_bindings;
 pub(crate) mod worktree;
 
 const TERMINAL_SESSION_OBSERVE_USAGE: &str =
-    "usage: herdr terminal session observe <target> [--cols N] [--rows N]";
+    "usage: sy-term terminal session observe <target> [--cols N] [--rows N]";
 const TERMINAL_SESSION_CONTROL_USAGE: &str =
-    "usage: herdr terminal session control <target> [--takeover] [--cols N] [--rows N]";
+    "usage: sy-term terminal session control <target> [--takeover] [--cols N] [--rows N]";
 pub(crate) const AGENT_HELP_FOOTER: &str = concat!(
     "Are you an AI? Use these resources ONLY IF your task specifically asks you to:\n",
-    "  Help a human understand or set up Herdr for the first time:\n",
-    "    https://herdr.dev/agent-guide.md\n",
-    "  Debug or investigate a problem with Herdr:\n",
-    "    https://herdr.dev/llms.txt\n",
-    "  Control Herdr panes, agents, or workspaces:\n",
-    "    SKIP if a Herdr skill is already in your context. Otherwise run: herdr --skill",
+    "  Control sy-term panes, agents, or workspaces:\n",
+    "    SKIP if a sy-term skill is already in your context. Otherwise run: sy-term --skill\n",
+    "  Help a human understand or set up sy-term, or debug a problem with it:\n",
+    "    read the source and docs that ship with this build",
 );
+
+pub(crate) fn caller_pane_id() -> Option<String> {
+    std::env::var("HERDR_PANE_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+}
 
 pub(crate) fn parse_token_assignment(raw: &str) -> Result<(String, Option<String>), String> {
     let Some((key, value)) = raw.split_once('=') else {
@@ -93,10 +95,6 @@ pub(super) fn print_read_response(response: &serde_json::Value) -> std::io::Resu
     Ok(0)
 }
 
-pub(crate) fn maybe_run_machine(args: &[String]) -> Option<std::io::Result<CommandOutcome>> {
-    target::maybe_run(args)
-}
-
 pub fn maybe_run(args: &[String]) -> std::io::Result<CommandOutcome> {
     let Some(command) = args.get(1).map(|arg| arg.as_str()) else {
         return Ok(CommandOutcome::NotCli);
@@ -124,8 +122,6 @@ pub fn maybe_run(args: &[String]) -> std::io::Result<CommandOutcome> {
         "status" => status::run_status_command(&args[2..])?,
         "completion" | "completions" => completion::run_completion_command(&args[2..])?,
         "config" => run_config_command(&args[2..])?,
-        "channel" => run_channel_command(&args[2..])?,
-        "machine" => machine::run_machine_command(&args[2..])?,
         "workspace" => workspace::run_workspace_command(&args[2..])?,
         "worktree" => worktree::run_worktree_command(&args[2..])?,
         "tab" => tab::run_tab_command(&args[2..])?,
@@ -156,136 +152,6 @@ fn api_group(name: &str) -> Option<clap::Command> {
     })
 }
 
-fn run_channel_command(args: &[String]) -> std::io::Result<i32> {
-    match args.first().map(|arg| arg.as_str()) {
-        Some("set") => channel_set(&args[1..]),
-        Some("show") if args.len() == 1 => {
-            let config = crate::config::Config::load().config;
-            println!("{}", config.update.channel.as_str());
-            Ok(0)
-        }
-        Some("help" | "--help" | "-h") => {
-            print_channel_help();
-            Ok(0)
-        }
-        _ => {
-            print_channel_help();
-            Ok(2)
-        }
-    }
-}
-
-fn channel_set(args: &[String]) -> std::io::Result<i32> {
-    let Some(channel) = parse_channel_set_arg(args) else {
-        eprintln!("usage: herdr channel set <stable|preview>");
-        return Ok(2);
-    };
-
-    if let Some(reason) = channel_set_rejection(
-        channel,
-        crate::update::preview_channel_rejection_for_current_install(),
-    ) {
-        eprintln!("{reason}.");
-        return Ok(1);
-    }
-
-    let path = crate::config::config_path();
-    let content = if path.exists() {
-        std::fs::read_to_string(&path)?
-    } else {
-        String::new()
-    };
-    if let Err(err) = content.parse::<toml::Value>() {
-        eprintln!(
-            "config file at {} is invalid TOML: {err}. Fix it before changing the update channel.",
-            path.display()
-        );
-        return Ok(1);
-    }
-
-    let updated = crate::config::upsert_section_value(
-        &content,
-        "update",
-        "channel",
-        &format!("\"{channel}\""),
-    );
-    if let Err(err) = updated.parse::<toml::Value>() {
-        eprintln!(
-            "changing the update channel would make {} invalid TOML: {err}; leaving config unchanged",
-            path.display()
-        );
-        return Ok(1);
-    }
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-    std::fs::write(&path, updated)?;
-    println!(
-        "Herdr update channel set to {channel} in {}.",
-        path.display()
-    );
-
-    match channel_set_install_action(
-        crate::update::package_manager_channel_update_guidance_for_current_install(),
-    ) {
-        ChannelSetInstallAction::PrintGuidance(guidance) => {
-            println!("{guidance}");
-            return Ok(0);
-        }
-        ChannelSetInstallAction::RunSelfUpdate => {}
-    }
-
-    crate::platform::end_cli_output();
-    if let Err(err) = crate::update::self_update(crate::update::SelfUpdateOptions::default()) {
-        eprintln!("update failed: {err}");
-        eprintln!("Run `herdr update` to retry.");
-        return Ok(1);
-    }
-
-    Ok(0)
-}
-
-fn parse_channel_set_arg(args: &[String]) -> Option<&str> {
-    let channel = args.first().map(|arg| arg.as_str())?;
-    if args.len() == 1 && matches!(channel, "stable" | "preview") {
-        Some(channel)
-    } else {
-        None
-    }
-}
-
-fn channel_set_rejection(
-    channel: &str,
-    install_rejection: Option<&'static str>,
-) -> Option<&'static str> {
-    if channel == "preview" {
-        return install_rejection;
-    }
-
-    None
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ChannelSetInstallAction {
-    RunSelfUpdate,
-    PrintGuidance(&'static str),
-}
-
-fn channel_set_install_action(
-    package_manager_guidance: Option<&'static str>,
-) -> ChannelSetInstallAction {
-    match package_manager_guidance {
-        Some(guidance) => ChannelSetInstallAction::PrintGuidance(guidance),
-        None => ChannelSetInstallAction::RunSelfUpdate,
-    }
-}
-
-fn print_channel_help() {
-    eprintln!("herdr channel commands:");
-    eprintln!("  herdr channel show                  print the configured update channel");
-    eprintln!("  herdr channel set <stable|preview>  choose the update channel");
-}
-
 fn run_config_command(args: &[String]) -> std::io::Result<i32> {
     let Some(subcommand) = args.first().map(|arg| arg.as_str()) else {
         print_config_help();
@@ -310,11 +176,11 @@ fn config_check(args: &[String]) -> std::io::Result<i32> {
     match args {
         [] => {}
         [flag] if matches!(flag.as_str(), "help" | "--help" | "-h") => {
-            eprintln!("usage: herdr config check");
+            eprintln!("usage: sy-term config check");
             return Ok(0);
         }
         _ => {
-            eprintln!("usage: herdr config check");
+            eprintln!("usage: sy-term config check");
             return Ok(2);
         }
     }
@@ -334,7 +200,7 @@ fn config_check(args: &[String]) -> std::io::Result<i32> {
 
 fn config_reset_keys(args: &[String]) -> std::io::Result<i32> {
     if !args.is_empty() {
-        eprintln!("usage: herdr config reset-keys");
+        eprintln!("usage: sy-term config reset-keys");
         return Ok(2);
     }
 
@@ -399,8 +265,10 @@ fn config_reset_keys(args: &[String]) -> std::io::Result<i32> {
         "Removed [keys], [keys.indexed], and [[keys.command]] from {}.",
         path.display()
     );
-    println!("Built-in v2 keybindings will apply after Herdr restarts or reloads config.");
-    println!("If a Herdr server is running, run `herdr server reload-config` to apply this now.");
+    println!("Built-in v2 keybindings will apply after sy-term restarts or reloads config.");
+    println!(
+        "If a sy-term server is running, run `sy-term server reload-config` to apply this now."
+    );
     println!(
         "To restore: cp {} {}",
         backup_path.display(),
@@ -469,15 +337,15 @@ fn session_attach_help(args: &[String]) -> std::io::Result<i32> {
         args.first().map(String::as_str),
         Some("help" | "--help" | "-h")
     ) {
-        eprintln!("usage: herdr session attach <name>");
+        eprintln!("usage: sy-term session attach <name>");
         return Ok(0);
     }
-    eprintln!("usage: herdr session attach <name>");
+    eprintln!("usage: sy-term session attach <name>");
     Ok(2)
 }
 
 fn session_list(args: &[String]) -> std::io::Result<i32> {
-    let json = match parse_session_json_only(args, "usage: herdr session list [--json]") {
+    let json = match parse_session_json_only(args, "usage: sy-term session list [--json]") {
         Ok(json) => json,
         Err(code) => return Ok(code),
     };
@@ -495,7 +363,7 @@ fn session_list(args: &[String]) -> std::io::Result<i32> {
 
 fn session_stop(args: &[String]) -> std::io::Result<i32> {
     let (name, json) =
-        match parse_session_name_and_json(args, "usage: herdr session stop <name> [--json]") {
+        match parse_session_name_and_json(args, "usage: sy-term session stop <name> [--json]") {
             Ok(parsed) => parsed,
             Err(code) => return Ok(code),
         };
@@ -528,7 +396,7 @@ fn session_stop(args: &[String]) -> std::io::Result<i32> {
 
 fn session_delete(args: &[String]) -> std::io::Result<i32> {
     let (name, json) =
-        match parse_session_name_and_json(args, "usage: herdr session delete <name> [--json]") {
+        match parse_session_name_and_json(args, "usage: sy-term session delete <name> [--json]") {
             Ok(parsed) => parsed,
             Err(code) => return Ok(code),
         };
@@ -555,7 +423,7 @@ fn session_delete(args: &[String]) -> std::io::Result<i32> {
 fn terminal_attach(args: &[String]) -> std::io::Result<i32> {
     let (terminal_id, takeover) = match parse_attach_target(
         args,
-        "usage: herdr terminal attach <terminal_id> [--takeover]",
+        "usage: sy-term terminal attach <terminal_id> [--takeover]",
     ) {
         Ok(parsed) => parsed,
         Err(code) => return Ok(code),
@@ -775,7 +643,7 @@ pub(super) fn send_ok_request(method: Method) -> std::io::Result<i32> {
 }
 
 pub(super) fn send_request(request: &Request) -> std::io::Result<serde_json::Value> {
-    let client = target::api_client()?;
+    let client = ApiClient::local();
     ensure_server_protocol_compatible(&client, &request.id)?;
     client
         .request_value(request)
@@ -783,21 +651,24 @@ pub(super) fn send_request(request: &Request) -> std::io::Result<serde_json::Val
 }
 
 pub(super) fn send_request_unchecked(request: &Request) -> std::io::Result<serde_json::Value> {
-    let client = target::api_client()?;
+    let client = ApiClient::local();
     client
         .request_value(request)
         .map_err(|err| map_server_not_running_or_io(err, &request.id, &client))
 }
 
 fn ensure_server_protocol_compatible(client: &ApiClient, request_id: &str) -> std::io::Result<()> {
-    let status = target::server_status(client)
+    let status = client
+        .status()
         .map_err(|err| map_server_not_running_or_io(err, request_id, client))?;
     let server_protocol = status
         .protocol
         .ok_or_else(|| std::io::Error::other("server ping did not include a protocol version"))?;
-    let Some(response) =
-        protocol_guard::mismatch_response(request_id, server_protocol, &target::restart_guidance())
-    else {
+    let Some(response) = protocol_guard::mismatch_response(
+        request_id,
+        server_protocol,
+        &crate::session::active_restart_after_update_guidance(),
+    ) else {
         return Ok(());
     };
 
@@ -844,9 +715,6 @@ fn map_server_not_running_or_io(
     request_id: &str,
     client: &ApiClient,
 ) -> std::io::Error {
-    if target::is_remote() {
-        return target::remote_error(api_client_error_to_io(err));
-    }
     match err {
         ApiClientError::Io(io_err) if server_not_running_error(&io_err) => {
             server_not_running::reported_error(server_not_running::response(
@@ -887,25 +755,6 @@ pub(super) fn parse_u64_flag(flag: &str, value: &str) -> std::io::Result<u64> {
     value
         .parse::<u64>()
         .map_err(|_| std::io::Error::other(format!("invalid value for {flag}: {value}")))
-}
-
-/// Expand `--flag=value` tokens into separate `--flag` and `value` tokens so
-/// the hand-rolled subcommand parsers accept the same `--flag=value` form the
-/// clap-generated help and completions imply. Only `value_options` are split:
-/// boolean and unknown options keep their attached value so they still reach
-/// the parser's unknown-option branch.
-pub(super) fn expand_equals_args(args: &[String], value_options: &[&str]) -> Vec<String> {
-    let mut expanded = Vec::with_capacity(args.len());
-    for arg in args {
-        match arg.split_once('=') {
-            Some((flag, value)) if value_options.contains(&flag) => {
-                expanded.push(flag.to_string());
-                expanded.push(value.to_string());
-            }
-            _ => expanded.push(arg.clone()),
-        }
-    }
-    expanded
 }
 
 fn parse_session_json_only(args: &[String], usage: &str) -> Result<bool, i32> {
@@ -979,27 +828,27 @@ fn print_session_error(code: &str, message: &str) {
 }
 
 fn print_config_help() {
-    eprintln!("herdr config commands:");
-    eprintln!("  herdr config check  validate config.toml and print diagnostics");
-    eprintln!("  herdr config reset-keys  back up config.toml and remove custom keybindings");
+    eprintln!("sy-term config commands:");
+    eprintln!("  sy-term config check  validate config.toml and print diagnostics");
+    eprintln!("  sy-term config reset-keys  back up config.toml and remove custom keybindings");
 }
 
 fn print_terminal_help() {
-    eprintln!("herdr terminal commands:");
-    eprintln!("  herdr terminal attach <terminal_id> [--takeover]");
-    eprintln!("  herdr terminal session control <target> [--takeover] [--cols N] [--rows N]");
-    eprintln!("  herdr terminal session observe <target> [--cols N] [--rows N]");
-    eprintln!("  herdr terminal title set <title>");
-    eprintln!("  herdr terminal title clear");
+    eprintln!("sy-term terminal commands:");
+    eprintln!("  sy-term terminal attach <terminal_id> [--takeover]");
+    eprintln!("  sy-term terminal session control <target> [--takeover] [--cols N] [--rows N]");
+    eprintln!("  sy-term terminal session observe <target> [--cols N] [--rows N]");
+    eprintln!("  sy-term terminal title set <title>");
+    eprintln!("  sy-term terminal title clear");
     eprintln!("  detach from direct attach with ctrl+b q; send literal ctrl+b with ctrl+b ctrl+b");
 }
 
 fn print_session_help() {
-    eprintln!("herdr session commands:");
-    eprintln!("  herdr session list [--json]");
-    eprintln!("  herdr session attach <name>");
-    eprintln!("  herdr session stop <name> [--json]");
-    eprintln!("  herdr session delete <name> [--json]");
+    eprintln!("sy-term session commands:");
+    eprintln!("  sy-term session list [--json]");
+    eprintln!("  sy-term session attach <name>");
+    eprintln!("  sy-term session stop <name> [--json]");
+    eprintln!("  sy-term session delete <name> [--json]");
     eprintln!("  use 'default' as <name> to target the default session for stop");
 }
 
@@ -1008,48 +857,27 @@ fn _print_json<T: Serialize>(value: &T) {
 }
 
 #[cfg(test)]
+/// Expand `--flag=value` tokens into separate `--flag` and `value` tokens so
+/// the hand-rolled subcommand parsers accept the same `--flag=value` form the
+/// clap-generated help and completions imply. Only `value_options` are split:
+/// boolean and unknown options keep their attached value so they still reach
+/// the parser's unknown-option branch.
+pub(super) fn expand_equals_args(args: &[String], value_options: &[&str]) -> Vec<String> {
+    let mut expanded = Vec::with_capacity(args.len());
+    for arg in args {
+        match arg.split_once('=') {
+            Some((flag, value)) if value_options.contains(&flag) => {
+                expanded.push(flag.to_string());
+                expanded.push(value.to_string());
+            }
+            _ => expanded.push(arg.clone()),
+        }
+    }
+    expanded
+}
+
+#[cfg(test)]
 mod tests {
-    #[test]
-    fn parses_channel_set_argument() {
-        assert_eq!(
-            super::parse_channel_set_arg(&["preview".to_string()]),
-            Some("preview")
-        );
-        assert_eq!(
-            super::parse_channel_set_arg(&["stable".to_string()]),
-            Some("stable")
-        );
-        assert_eq!(super::parse_channel_set_arg(&["nightly".to_string()]), None);
-        assert_eq!(
-            super::parse_channel_set_arg(&["preview".to_string(), "stable".to_string()]),
-            None
-        );
-    }
-
-    #[test]
-    fn channel_set_only_applies_package_rejection_to_preview() {
-        assert_eq!(
-            super::channel_set_rejection("preview", Some("no preview")),
-            Some("no preview")
-        );
-        assert_eq!(
-            super::channel_set_rejection("stable", Some("no preview")),
-            None
-        );
-        assert_eq!(super::channel_set_rejection("preview", None), None);
-    }
-
-    #[test]
-    fn channel_set_skips_self_update_for_package_manager_guidance() {
-        assert_eq!(
-            super::channel_set_install_action(Some("use package manager")),
-            super::ChannelSetInstallAction::PrintGuidance("use package manager")
-        );
-        assert_eq!(
-            super::channel_set_install_action(None),
-            super::ChannelSetInstallAction::RunSelfUpdate
-        );
-    }
 
     #[test]
     fn session_name_parser_accepts_option_terminator() {

@@ -28,7 +28,7 @@ fn unique_test_dir() -> PathBuf {
         .unwrap()
         .as_nanos();
     PathBuf::from(format!(
-        "/tmp/herdr-multi-client-{}-{nanos}",
+        "/tmp/syt-multi-client-{}-{nanos}",
         std::process::id()
     ))
 }
@@ -76,10 +76,10 @@ fn wait_for_socket(path: &Path, timeout: Duration) {
 }
 
 fn spawn_server(config: &Path, runtime: &Path, api: &Path) -> SpawnedHerdr {
-    fs::create_dir_all(config.join("herdr")).unwrap();
+    fs::create_dir_all(config.join("sy-term")).unwrap();
     fs::create_dir_all(runtime).unwrap();
     register_runtime_dir(runtime);
-    fs::write(config.join("herdr/config.toml"), "onboarding = false\n").unwrap();
+    fs::write(config.join("sy-term/config.toml"), "onboarding = false\n").unwrap();
     let pair = native_pty_system()
         .openpty(PtySize {
             rows: 24,
@@ -88,7 +88,7 @@ fn spawn_server(config: &Path, runtime: &Path, api: &Path) -> SpawnedHerdr {
             pixel_height: 0,
         })
         .unwrap();
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_sy-term"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config);
@@ -116,7 +116,7 @@ fn spawn_client(config: &Path, runtime: &Path, api: &Path) -> SpawnedHerdr {
             pixel_height: 0,
         })
         .unwrap();
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_sy-term"));
     support::isolate_herdr_test_process(&mut cmd);
     cmd.arg("client");
     cmd.env("HERDR_DISABLE_SOUND", "1");
@@ -272,8 +272,8 @@ fn same_tab_geometry_follows_meaningful_client_activity() {
     let base = unique_test_dir();
     let config = base.join("config");
     let runtime = base.join("runtime");
-    let api = runtime.join("herdr.sock");
-    let clients = runtime.join("herdr-client.sock");
+    let api = runtime.join("sy-term.sock");
+    let clients = runtime.join("sy-term-client.sock");
     let server = spawn_server(&config, &runtime, &api);
     wait_for_socket(&api, Duration::from_secs(10));
     wait_for_socket(&clients, Duration::from_secs(10));
@@ -305,8 +305,8 @@ fn api_pane_output_is_fanned_out_as_pane_surface_updates() {
     let base = unique_test_dir();
     let config = base.join("config");
     let runtime = base.join("runtime");
-    let api = runtime.join("herdr.sock");
-    let clients = runtime.join("herdr-client.sock");
+    let api = runtime.join("sy-term.sock");
+    let clients = runtime.join("sy-term-client.sock");
     let server = spawn_server(&config, &runtime, &api);
     wait_for_socket(&api, Duration::from_secs(10));
     wait_for_socket(&clients, Duration::from_secs(10));
@@ -339,8 +339,8 @@ fn crashed_client_shell_does_not_affect_survivor() {
     let base = unique_test_dir();
     let config = base.join("config");
     let runtime = base.join("runtime");
-    let api = runtime.join("herdr.sock");
-    let clients = runtime.join("herdr-client.sock");
+    let api = runtime.join("sy-term.sock");
+    let clients = runtime.join("sy-term-client.sock");
     let server = spawn_server(&config, &runtime, &api);
     wait_for_socket(&api, Duration::from_secs(10));
     wait_for_socket(&clients, Duration::from_secs(10));
@@ -372,8 +372,8 @@ fn rapid_client_shell_connect_disconnect_remains_healthy() {
     let base = unique_test_dir();
     let config = base.join("config");
     let runtime = base.join("runtime");
-    let api = runtime.join("herdr.sock");
-    let clients = runtime.join("herdr-client.sock");
+    let api = runtime.join("sy-term.sock");
+    let clients = runtime.join("sy-term-client.sock");
     let server = spawn_server(&config, &runtime, &api);
     wait_for_socket(&api, Duration::from_secs(10));
     wait_for_socket(&clients, Duration::from_secs(10));

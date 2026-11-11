@@ -32,7 +32,7 @@ fn rewrite_schema_refs(value: &mut serde_json::Value, schema_name: &str) {
 fn protocol_schema_document() -> serde_json::Value {
     serde_json::json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "title": "Herdr API",
+        "title": "sy-term API",
         "schema_version": 1,
         "protocol": crate::protocol::PROTOCOL_VERSION,
         "schemas": {
@@ -353,12 +353,12 @@ fn client_window_title_requests_round_trip() {
     let set = Request {
         id: "req_title_set".into(),
         method: Method::ClientWindowTitleSet(ClientWindowTitleSetParams {
-            title: "herdr api".into(),
+            title: "sy-term api".into(),
         }),
     };
     let json = serde_json::to_value(&set).unwrap();
     assert_eq!(json["method"], "client.window_title.set");
-    assert_eq!(json["params"]["title"], "herdr api");
+    assert_eq!(json["params"]["title"], "sy-term api");
     let restored: Request = serde_json::from_value(json).unwrap();
     assert_eq!(restored, set);
 
@@ -794,7 +794,7 @@ fn worktree_request_and_response_round_trip() {
             workspace: WorkspaceInfo {
                 workspace_id: "w_1".into(),
                 number: 2,
-                label: "herdr".into(),
+                label: "sy-term".into(),
                 focused: true,
                 pane_count: 1,
                 tab_count: 1,
@@ -802,10 +802,10 @@ fn worktree_request_and_response_round_trip() {
                 agent_status: AgentStatus::Unknown,
                 tokens: HashMap::new(),
                 worktree: Some(WorkspaceWorktreeInfo {
-                    repo_key: "/repo/herdr/.git".into(),
-                    repo_name: "herdr".into(),
-                    repo_root: "/repo/herdr".into(),
-                    checkout_path: "/worktrees/herdr/worktree-api".into(),
+                    repo_key: "/repo/sy-term/.git".into(),
+                    repo_name: "sy-term".into(),
+                    repo_root: "/repo/sy-term".into(),
+                    checkout_path: "/worktrees/sy-term/worktree-api".into(),
                     is_linked_worktree: true,
                 }),
             },
@@ -813,7 +813,7 @@ fn worktree_request_and_response_round_trip() {
                 tab_id: "w_1:1".into(),
                 workspace_id: "w_1".into(),
                 number: 1,
-                label: "herdr".into(),
+                label: "sy-term".into(),
                 focused: true,
                 pane_count: 1,
                 agent_status: AgentStatus::Unknown,
@@ -824,7 +824,7 @@ fn worktree_request_and_response_round_trip() {
                 workspace_id: "w_1".into(),
                 tab_id: "w_1:1".into(),
                 focused: true,
-                cwd: Some("/worktrees/herdr/worktree-api".into()),
+                cwd: Some("/worktrees/sy-term/worktree-api".into()),
                 foreground_cwd: None,
                 restore_error: None,
                 label: None,
@@ -841,14 +841,14 @@ fn worktree_request_and_response_round_trip() {
                 revision: 0,
             },
             worktree: WorktreeInfo {
-                path: "/worktrees/herdr/worktree-api".into(),
+                path: "/worktrees/sy-term/worktree-api".into(),
                 branch: Some("worktree/api".into()),
                 is_bare: false,
                 is_detached: false,
                 is_prunable: false,
                 is_linked_worktree: true,
                 open_workspace_id: Some("w_1".into()),
-                label: "herdr".into(),
+                label: "sy-term".into(),
             },
         },
     };
@@ -881,7 +881,7 @@ fn worktree_lifecycle_events_round_trip() {
     let workspace = WorkspaceInfo {
         workspace_id: "w_2".into(),
         number: 2,
-        label: "herdr".into(),
+        label: "sy-term".into(),
         focused: true,
         pane_count: 1,
         tab_count: 1,
@@ -889,22 +889,22 @@ fn worktree_lifecycle_events_round_trip() {
         agent_status: AgentStatus::Unknown,
         tokens: HashMap::new(),
         worktree: Some(WorkspaceWorktreeInfo {
-            repo_key: "/repo/herdr/.git".into(),
-            repo_name: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/worktrees/herdr/worktree-api".into(),
+            repo_key: "/repo/sy-term/.git".into(),
+            repo_name: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
+            checkout_path: "/worktrees/sy-term/worktree-api".into(),
             is_linked_worktree: true,
         }),
     };
     let worktree = WorktreeInfo {
-        path: "/worktrees/herdr/worktree-api".into(),
+        path: "/worktrees/sy-term/worktree-api".into(),
         branch: Some("worktree/api".into()),
         is_bare: false,
         is_detached: false,
         is_prunable: false,
         is_linked_worktree: true,
         open_workspace_id: Some("w_2".into()),
-        label: "herdr".into(),
+        label: "sy-term".into(),
     };
 
     for event in [

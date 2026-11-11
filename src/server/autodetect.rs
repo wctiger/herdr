@@ -155,7 +155,7 @@ fn client_protocol_accepts_hello(socket_path: &Path) -> io::Result<bool> {
 fn validate_running_server_compatibility(saved_federation: bool) -> io::Result<()> {
     let Some(status) = read_server_status()? else {
         return Err(io::Error::other(format!(
-            "a herdr server is listening, but its status API is unavailable.\n\n{}\nIf that fails, stop the old server process manually.",
+            "a sy-term server is listening, but its status API is unavailable.\n\n{}\nIf that fails, stop the old server process manually.",
             crate::session::active_restart_after_update_guidance()
         )));
     };
@@ -176,7 +176,7 @@ fn validate_running_server_compatibility(saved_federation: bool) -> io::Result<(
         "the stable endpoint generation is incompatible"
     };
     Err(io::Error::other(format!(
-        "This session needs one final server update before Herdr can attach ({requirement}).\n\nserver: v{} endpoint generation {}\nclient: v{} endpoint generation {}\n\n{}",
+        "This session needs one final server update before sy-term can attach ({requirement}).\n\nserver: v{} endpoint generation {}\nclient: v{} endpoint generation {}\n\n{}",
         status.version.as_deref().unwrap_or("unknown"),
         endpoint_generation
             .map(|value| value.to_string())
@@ -205,7 +205,7 @@ pub fn spawn_server_daemon() -> io::Result<u32> {
     let exe = std::env::current_exe().map_err(|err| {
         io::Error::new(
             err.kind(),
-            format!("failed to determine herdr executable path: {err}"),
+            format!("failed to determine sy-term executable path: {err}"),
         )
     })?;
 
@@ -215,7 +215,7 @@ pub fn spawn_server_daemon() -> io::Result<u32> {
 
     let pid =
         crate::platform::launch_server_daemon_command(&mut command).map_err(|err: io::Error| {
-            io::Error::new(err.kind(), format!("failed to spawn herdr server: {err}"))
+            io::Error::new(err.kind(), format!("failed to spawn sy-term server: {err}"))
         })?;
     info!(pid, "server daemon spawned");
 
@@ -280,10 +280,10 @@ pub fn wait_for_server_socket(socket_path: &Path, timeout: Duration) -> io::Resu
     Err(io::Error::new(
         io::ErrorKind::TimedOut,
         format!(
-            "server did not become ready within {}s (socket: {}). The background server may still be starting; try `herdr` again, or check {}",
+            "server did not become ready within {}s (socket: {}). The background server may still be starting; try `sy-term` again, or check {}",
             timeout.as_secs(),
             socket_path.display(),
-            crate::session::data_dir().join("herdr-server.log").display()
+            crate::session::data_dir().join("sy-term-server.log").display()
         ),
     ))
 }
@@ -353,7 +353,7 @@ mod windows_tests {
     #[test]
     fn reachability_distinguishes_denied_silent_busy_and_absent_pipes() {
         let path =
-            std::env::temp_dir().join(format!("herdr-startup-probe-{}.sock", std::process::id()));
+            std::env::temp_dir().join(format!("sy-term-startup-probe-{}.sock", std::process::id()));
         let name = path.to_string_lossy();
         let denied = ListenerOptions::new()
             .name(name.to_ns_name::<GenericNamespaced>().unwrap())
@@ -444,13 +444,13 @@ mod tests {
         std::env::remove_var(crate::session::SESSION_ENV_VAR);
         crate::session::clear_explicit_session_for_test();
         let args = vec![
-            "herdr".to_string(),
+            "sy-term".to_string(),
             "--session".to_string(),
             "work".to_string(),
         ];
         crate::session::configure_from_args(&args).unwrap();
 
-        let command = build_server_daemon_command(PathBuf::from("/tmp/herdr-test"));
+        let command = build_server_daemon_command(PathBuf::from("/tmp/sy-term-test"));
         let envs: Vec<_> = command.get_envs().collect();
 
         assert!(envs.iter().any(|(key, value)| {
@@ -468,7 +468,7 @@ mod tests {
     #[test]
     fn server_daemon_command_passes_current_dir_as_startup_cwd() {
         let expected = std::env::current_dir().unwrap();
-        let command = build_server_daemon_command(PathBuf::from("/tmp/herdr-test"));
+        let command = build_server_daemon_command(PathBuf::from("/tmp/sy-term-test"));
         let envs: Vec<_> = command.get_envs().collect();
 
         assert!(envs.iter().any(|(key, value)| {
@@ -668,11 +668,11 @@ test "$sid" = "$$"
             "unexpected error: {message}"
         );
         assert!(
-            message.contains("Run `herdr session stop work`"),
+            message.contains("Run `sy-term session stop work`"),
             "unexpected error: {message}"
         );
         assert!(
-            message.contains("then run `herdr session attach work` again"),
+            message.contains("then run `sy-term session attach work` again"),
             "unexpected error: {message}"
         );
         std::env::remove_var("XDG_CONFIG_HOME");

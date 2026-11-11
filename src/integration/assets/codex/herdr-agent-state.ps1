@@ -1,5 +1,5 @@
-# installed by herdr
-# managed by herdr; reinstalling or updating the integration overwrites this file.
+# installed by sy-term
+# managed by sy-term; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=codex
 # HERDR_INTEGRATION_VERSION=10
@@ -28,7 +28,7 @@ if ([string]::IsNullOrWhiteSpace($payload.transcript_path)) { exit 0 }
 if (-not [string]::IsNullOrWhiteSpace($env:CODEX_THREAD_ID) -and $env:CODEX_THREAD_ID -ne $sessionId) { exit 0 }
 
 $seq = [DateTimeOffset]::UtcNow.Ticks
-$herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "herdr" } else { $env:HERDR_BIN_PATH }
+$herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "sy-term" } else { $env:HERDR_BIN_PATH }
 try {
     $args = @(
         "pane",

@@ -35,7 +35,7 @@ impl ConfigEdit<'_> {
             Self::ToastDelivery(delivery) => {
                 let value = match delivery {
                     super::ToastDelivery::Off => "\"off\"",
-                    super::ToastDelivery::Herdr => "\"herdr\"",
+                    super::ToastDelivery::Herdr => "\"sy-term\"",
                     super::ToastDelivery::Terminal => "\"terminal\"",
                     super::ToastDelivery::System => "\"system\"",
                 };
@@ -49,7 +49,7 @@ impl ConfigEdit<'_> {
 pub(crate) fn update_file_at(
     path: &std::path::Path,
     description: &str,
-    update: impl FnOnce(&str) -> String,
+    update: impl FnOnce(&str) -> Result<String, String>,
 ) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
@@ -64,13 +64,13 @@ pub(crate) fn update_file_at(
             ));
         }
     };
-    std::fs::write(path, update(&content))
-        .map_err(|error| format!("failed to save {description}: {error}"))
+    let updated = update(&content)?;
+    std::fs::write(path, updated).map_err(|error| format!("failed to save {description}: {error}"))
 }
 
 pub(crate) fn write_edit(edit: ConfigEdit<'_>) -> Result<(), String> {
     update_file_at(&super::config_path(), edit.description(), |content| {
-        edit.apply(content)
+        Ok(edit.apply(content))
     })
 }
 
@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn update_file_at_does_not_move_a_leading_bom_into_the_file() {
-        let dir = std::env::temp_dir().join(format!("herdr-config-bom-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("syt-config-bom-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("config.toml");
         std::fs::write(
@@ -90,7 +90,11 @@ mod tests {
         .unwrap();
 
         update_file_at(&path, "onboarding setting", |content| {
-            crate::config::upsert_top_level_bool(content, "onboarding", false)
+            Ok(crate::config::upsert_top_level_bool(
+                content,
+                "onboarding",
+                false,
+            ))
         })
         .unwrap();
 

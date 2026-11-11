@@ -1,85 +1,88 @@
-# herdr
+# sy-term
 
+sy-term is an offline fork of [herdr](https://github.com/herdrdev/herdr), the
+terminal workspace manager for AI coding agents. It keeps herdr's local terminal
+runtime and removes every feature that needs a network connection, so it can be
+used in sensitive or air-gapped environments.
 
-<p align="center">
-  <img src="assets/logo.png" alt="herdr" width="100" />
-</p>
+sy-term is distributed under the [Apache License 2.0](LICENSE), the same license
+as herdr. See [NOTICE](NOTICE) for attribution and a summary of the changes.
 
-<p align="center">
-  <a href="https://herdr.dev">herdr.dev</a> · <a href="#install">install</a> · <a href="https://herdr.dev/docs/quick-start/">quick start</a> · <a href="https://herdr.dev/docs/">docs</a>
-</p>
+## What it does
 
-<p align="center">
-  English · <a href="README.zh-CN.md">简体中文</a>
-</p>
+- Keeps terminals running in a background server when the client detaches, and
+  restores the saved layout after a restart.
+- Marks every pane as working, blocked or idle, so agents that need an answer
+  are easy to find.
+- Lets agents drive panes, tabs and workspaces through the `sy-term` CLI and the
+  local socket API.
+- Supports tmux-style prefix keys as well as mouse click, drag and split.
+- Runs local plugins linked from a directory on disk.
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-666666?labelColor=333333" alt="Apache 2.0 license" /></a>
-  <a href="https://github.com/herdrdev/herdr/releases"><img src="https://img.shields.io/github/downloads/herdrdev/herdr/total?labelColor=333333&color=666666" alt="total GitHub release downloads" /></a>
-  <a href="https://github.com/herdrdev/herdr/stargazers"><img src="https://img.shields.io/github/stars/herdrdev/herdr?labelColor=333333&color=666666&logo=github" alt="GitHub stars" /></a>
-  <a href="https://github.com/herdrdev/herdr/releases/latest"><img src="https://img.shields.io/github/v/release/herdrdev/herdr?label=release&labelColor=333333&color=666666" alt="latest stable release" /></a>
-  <a href="https://formulae.brew.sh/formula/herdr"><img src="https://img.shields.io/homebrew/v/herdr?label=homebrew&labelColor=333333&color=666666" alt="Homebrew version" /></a>
-  <a href="https://x.com/herdrdev"><img src="https://img.shields.io/badge/follow-%40herdrdev-000000?logo=x&logoColor=white" alt="follow @herdrdev on X" /></a>
-</p>
+## Removed from herdr
 
----
+These features contacted the network and are not present in sy-term:
 
-https://github.com/user-attachments/assets/043ec09f-4bdd-41d5-aee0-8fda6b83e267
+- **Self-update and update checks:** `herdr update`, `herdr channel`, background
+  version checks, update-ready notices and product announcements.
+- **Remote machines over SSH:** `--remote`, `--machine`, the `machine` command,
+  saved SSH machines in the sidebar, and the remote API/client bridges.
+- **Online agent-detection catalog:** the background fetch from herdr.dev and
+  `server update-agent-manifests`. Detection uses the bundled manifests and
+  optional local overrides in `~/.config/sy-term/agent-detection/`.
+- **GitHub plugin installs:** `plugin install` and `plugin update`. Use
+  `sy-term plugin link <path>` for plugins on disk.
 
-**the runtime your coding agents live on.**
+herdr has no telemetry, so there was none to remove.
 
-- **detach without stopping work** — herdr keeps terminals running in a background server when you close the client or lose your SSH connection. after a server or machine restart, herdr restores the saved layout and can resume supported agent sessions; the original processes do not survive. [session state →](https://herdr.dev/docs/session-state/)
-- **several machines, one window** — keep local work and saved ssh machines together, with a combined agent list and independent reconnects. [remote machines →](https://herdr.dev/docs/connecting-machines/)
-- **never hunt for the stuck one** — every pane is marked working, blocked, or idle. when an agent stops and needs an answer, herdr says so.
-- **agent-native** — agents drive herdr through the cli and socket api: they can spawn panes, prompt each other, and wait until another agent is genuinely blocked. [agent skill →](https://herdr.dev/docs/agent-skill/)
-- **runs what you already run** — claude code, codex, cursor, opencode, grok and the rest. herdr doesn't wrap or replace them; it owns their terminals. building an agent? [add herdr support →](https://herdr.dev/docs/add-herdr-support/)
-- **keyboard and mouse, both first-class** — tmux-style prefix keys *and* click, drag, split. pick per moment, not per tool.
-- **plugins** — extend panes and workflows. [browse the marketplace →](https://herdr.dev/plugins/)
-- **one rust binary, no electron** — runs in whatever terminal you already use.
+## Compatibility notes
 
----
+- Environment variables keep their `HERDR_` prefix (for example
+  `HERDR_CONFIG_PATH`, `HERDR_PANE_ID`, `HERDR_SOCKET_PATH`), so existing agent
+  hooks and scripts keep working.
+- Protocol and file-format identifiers are unchanged: the `herdr:<agent>` hook
+  source labels, the `herdr-plugin.toml` plugin manifest and its
+  `min_herdr_version` field, and the socket API schema.
+- Config, state, logs and sockets live under `sy-term` paths, for example
+  `~/.config/sy-term/config.toml` and `sy-term-server.log`. Config files may use
+  `delivery = "sy-term"` and `[ui.toast.sy-term]`; the herdr spellings still work.
+- The log filter target is the crate name, so verbose logging is
+  `HERDR_LOG=sy_term=debug` (upstream used `herdr=debug`).
+- The documents under `docs/` and `README.zh-CN.md` come from upstream herdr.
+  They still describe herdr, including the features removed above.
 
-## install
+## Build
 
-```bash
-curl -fsSL https://herdr.dev/install.sh | sh
-```
-
-or `brew install herdr` · `mise use -g herdr` · windows: `powershell -ExecutionPolicy Bypass -c "irm https://herdr.dev/install.ps1 | iex"` · [endpoint-protected Windows](https://herdr.dev/docs/windows-beta/) · [binaries](https://github.com/herdrdev/herdr/releases)
-
-then start it where the work lives:
-
-```bash
-herdr
-```
-
-run your agents, split panes, walk away. `ctrl+b q` detaches, `herdr` reattaches. [quick start →](https://herdr.dev/docs/quick-start/)
-
-## docs
-
-everything lives at [herdr.dev/docs](https://herdr.dev/docs/): [quick start](https://herdr.dev/docs/quick-start/) · [concepts](https://herdr.dev/docs/concepts/) · [supported agents](https://herdr.dev/docs/agents/) · [keyboard](https://herdr.dev/docs/keyboard/) · [configuration](https://herdr.dev/docs/configuration/) · [session state](https://herdr.dev/docs/session-state/) · [connecting machines](https://herdr.dev/docs/connecting-machines/) · [remote](https://herdr.dev/docs/persistence-remote/) · [integrations](https://herdr.dev/docs/integrations/) · [add herdr support to your agent](https://herdr.dev/docs/add-herdr-support/) · [plugins](https://herdr.dev/docs/plugins/) · [socket api](https://herdr.dev/docs/socket-api/)
-
-## thanks
-
-every past sponsor and backer is listed in [SPONSORS.md](./SPONSORS.md) — thank you 🐑
-
-enterprise / partnership: hey@herdr.dev
-
-## agent instructions
-
-if you are an ai agent helping with this repository, read [`AGENTS.md`](./AGENTS.md) before making changes and read [`CONTRIBUTING.md`](./CONTRIBUTING.md) before opening issues or PRs.
-
-## development
+Building requires Rust (see `rust-toolchain.toml`) and Zig 0.16.0 for the
+vendored libghostty-vt.
 
 ```bash
-git clone https://github.com/herdrdev/herdr
-cd herdr
 cargo build --release
+./target/release/sy-term
+```
 
+The first build fetches Zig package dependencies. To build fully offline,
+populate the Zig package cache on a connected machine first and copy it over.
+
+See [BUILDING-WINDOWS.md](BUILDING-WINDOWS.md) for Windows prerequisites and a
+smoke-test checklist.
+
+```bash
 just test        # unit tests
 just check       # formatting, tests, and maintenance checks
 ```
 
-## license
+## Usage
 
-Herdr is licensed under the [Apache License 2.0](LICENSE).
+```bash
+sy-term                 # launch or attach to the persistent session
+sy-term --help          # list commands
+sy-term --default-config
+```
+
+Press `ctrl+b q` to detach, and run `sy-term` again to reattach.
+
+## License
+
+sy-term is licensed under the [Apache License 2.0](LICENSE). It is a derivative
+work of herdr; the original copyright notices are preserved.

@@ -1396,60 +1396,6 @@ impl AppState {
                 Vec::new()
             }
             AppEvent::WorktreeRuntimeRestoreFailed { .. } => Vec::new(),
-            AppEvent::UpdateReady {
-                version,
-                install_command,
-            } => {
-                self.update_available = Some(version.clone());
-                self.update_install_command = install_command.clone();
-                self.latest_release_notes_available = true;
-                self.update_dismissed = true;
-                if matches!(
-                    self.toast_config.delivery,
-                    crate::config::ToastDelivery::Herdr
-                ) {
-                    self.toast = Some(ToastNotification {
-                        kind: ToastKind::UpdateInstalled,
-                        title: format!("v{version} available"),
-                        context: crate::update::update_install_instruction(&install_command),
-                        position: None,
-                        target: None,
-                    });
-                }
-                Vec::new()
-            }
-            AppEvent::AgentDetectionManifestsUpdated {
-                updated, status, ..
-            } => {
-                self.agent_manifest_update_status = status;
-                self.refresh_agent_manifest_summaries();
-                if !updated.is_empty()
-                    && matches!(
-                        self.toast_config.delivery,
-                        crate::config::ToastDelivery::Herdr
-                    )
-                {
-                    let agent_list = updated
-                        .iter()
-                        .map(|item| {
-                            format!(
-                                "{} {}",
-                                crate::detect::agent_label(item.agent),
-                                item.version
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    self.toast = Some(ToastNotification {
-                        kind: ToastKind::UpdateInstalled,
-                        title: "Agent detection rules updated".to_string(),
-                        context: agent_list,
-                        position: None,
-                        target: None,
-                    });
-                }
-                Vec::new()
-            }
             AppEvent::AgentProcessDetected {
                 pane_id,
                 agent,
@@ -2150,8 +2096,8 @@ mod tests {
     fn mark_linked_worktree(state: &mut AppState, ws_idx: usize) {
         state.workspaces[ws_idx].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
             checkout_path: format!("/repo/worktree-{ws_idx}").into(),
             is_linked_worktree: true,
         });
@@ -2160,9 +2106,9 @@ mod tests {
     fn mark_parent_worktree(state: &mut AppState, ws_idx: usize) {
         state.workspaces[ws_idx].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
+            checkout_path: "/repo/sy-term".into(),
             is_linked_worktree: false,
         });
     }
@@ -2261,9 +2207,9 @@ mod tests {
                 "./src/app/actions.rs:795",
             ),
             (
-                "open ../herdr-worktrees/issue-1",
-                "herdr",
-                "../herdr-worktrees/issue-1",
+                "open ../sy-term-worktrees/issue-1",
+                "sy-term",
+                "../sy-term-worktrees/issue-1",
             ),
             (
                 "edit src/app/actions.rs,then",
@@ -2299,7 +2245,11 @@ mod tests {
             ),
             ("refs #123 and @owner/name", "#123", "#123"),
             ("refs #123 and @owner/name", "owner", "@owner/name"),
-            ("cargo test --package=herdr", "--package", "--package=herdr"),
+            (
+                "cargo test --package=sy-term",
+                "--package",
+                "--package=sy-term",
+            ),
             (
                 "cargo test app::actions::tests",
                 "app::",
@@ -2312,7 +2262,7 @@ mod tests {
             ),
             ("ERROR [worker-1] request_id=abc-123", "worker", "worker-1"),
             (
-                "tmux|newhoo|fixhoo|newmoo|notification|window_bell|herdr",
+                "tmux|newhoo|fixhoo|newmoo|notification|window_bell|sy-term",
                 "newhoo",
                 "newhoo",
             ),
@@ -2359,7 +2309,7 @@ mod tests {
     fn double_click_word_bounds_ignore_delimiters() {
         for (row, click) in [
             (
-                "tmux|newhoo|fixhoo|newmoo|notification|window_bell|herdr",
+                "tmux|newhoo|fixhoo|newmoo|notification|window_bell|sy-term",
                 "|",
             ),
             ("alpha,beta;gamma", ","),
@@ -2888,16 +2838,16 @@ mod tests {
         let mut state = app_with_workspaces(&["main", "issue", "notes"]);
         state.workspaces[0].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
+            checkout_path: "/repo/sy-term".into(),
             is_linked_worktree: false,
         });
         state.workspaces[1].worktree_space = Some(crate::workspace::WorktreeSpaceMembership {
             key: "repo-key".into(),
-            label: "herdr".into(),
-            repo_root: "/repo/herdr".into(),
-            checkout_path: "/repo/herdr-issue".into(),
+            label: "sy-term".into(),
+            repo_root: "/repo/sy-term".into(),
+            checkout_path: "/repo/syt-issue".into(),
             is_linked_worktree: true,
         });
         state.selected = 0;
@@ -4133,8 +4083,7 @@ mod tests {
             .unwrap()
             .attached_terminal_id
             .clone();
-        let cwd =
-            std::env::temp_dir().join(format!("herdr-cwd-report-test-{}", std::process::id()));
+        let cwd = std::env::temp_dir().join(format!("syt-cwd-report-test-{}", std::process::id()));
         std::fs::create_dir_all(&cwd).unwrap();
         state.session_dirty = false;
 
@@ -4281,80 +4230,6 @@ mod tests {
         assert!(active_tab_suppresses_notifications(true, Some(true)));
         assert!(!active_tab_suppresses_notifications(true, Some(false)));
         assert!(!active_tab_suppresses_notifications(false, None));
-    }
-
-    #[test]
-    fn update_ready_sets_manual_update_toast() {
-        let mut state = AppState::test_new();
-        state.toast_config.delivery = crate::config::ToastDelivery::Herdr;
-
-        let updates = state.handle_app_event(AppEvent::UpdateReady {
-            version: "0.5.0".into(),
-            install_command: "herdr update".into(),
-        });
-
-        assert!(updates.is_empty());
-        assert_eq!(state.update_available.as_deref(), Some("0.5.0"));
-        assert!(state.latest_release_notes_available);
-        assert!(state.update_dismissed);
-        let toast = state.toast.as_ref().expect("update toast");
-        assert_eq!(toast.kind, ToastKind::UpdateInstalled);
-        assert_eq!(toast.title, "v0.5.0 available");
-        assert_eq!(
-            toast.context,
-            "detach, run `herdr update`, then run Herdr again to reconnect"
-        );
-    }
-
-    #[test]
-    fn update_ready_uses_event_install_command_in_toast() {
-        let mut state = AppState::test_new();
-        state.toast_config.delivery = crate::config::ToastDelivery::Herdr;
-
-        state.handle_app_event(AppEvent::UpdateReady {
-            version: "0.5.0".into(),
-            install_command: "brew update && brew upgrade herdr".into(),
-        });
-
-        assert_eq!(
-            state.update_install_command,
-            "brew update && brew upgrade herdr"
-        );
-        let toast = state.toast.as_ref().expect("update toast");
-        assert_eq!(
-            toast.context,
-            "detach, run `brew update && brew upgrade herdr`, then run Herdr again to reconnect"
-        );
-    }
-
-    #[test]
-    fn agent_detection_manifest_update_event_updates_status_and_toast() {
-        let mut state = AppState::test_new();
-        state.toast_config.delivery = crate::config::ToastDelivery::Herdr;
-        let status = crate::detect::manifest_update::ManifestUpdateStatus {
-            last_result: Some("checked".to_string()),
-            ..Default::default()
-        };
-
-        let updates = state.handle_app_event(AppEvent::AgentDetectionManifestsUpdated {
-            updated: vec![crate::detect::manifest_update::ManifestUpdateCommit {
-                agent: Agent::Codex,
-                version: crate::detect::manifest_update::ManifestVersion::parse("2026.06.10.1")
-                    .unwrap(),
-            }],
-            activated: Vec::new(),
-            status,
-        });
-
-        assert!(updates.is_empty());
-        assert_eq!(
-            state.agent_manifest_update_status.last_result.as_deref(),
-            Some("checked")
-        );
-        let toast = state.toast.as_ref().expect("manifest update toast");
-        assert_eq!(toast.kind, ToastKind::UpdateInstalled);
-        assert_eq!(toast.title, "Agent detection rules updated");
-        assert_eq!(toast.context, "codex 2026.06.10.1");
     }
 
     #[test]

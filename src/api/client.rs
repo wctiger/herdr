@@ -78,13 +78,6 @@ impl ApiClient {
         self.read_status(None)
     }
 
-    pub(crate) fn status_with_timeout(
-        &self,
-        timeout: Duration,
-    ) -> Result<crate::api::RuntimeStatus, ApiClientError> {
-        self.read_status(Some(timeout))
-    }
-
     fn read_status(
         &self,
         timeout: Option<Duration>,
@@ -122,6 +115,14 @@ impl ApiClient {
 
     fn connect(&self) -> io::Result<LocalStream> {
         crate::ipc::connect_local_stream(&self.socket_path())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn status_with_timeout(
+        &self,
+        timeout: Duration,
+    ) -> Result<crate::api::RuntimeStatus, ApiClientError> {
+        self.read_status(Some(timeout))
     }
 }
 
@@ -251,14 +252,15 @@ mod tests {
     #[test]
     fn local_session_target_resolves_named_session_socket() {
         let client = ApiClient::for_target(ConnectionTarget::LocalSession(Some("work".into())));
-        assert!(client.socket_path().ends_with("sessions/work/herdr.sock"));
+        assert!(client.socket_path().ends_with("sessions/work/sy-term.sock"));
     }
 
     #[test]
     fn status_timeout_closes_a_stalled_probe() {
+        #[cfg(unix)]
         use interprocess::local_socket::traits::Listener as _;
         let path =
-            std::env::temp_dir().join(format!("herdr-status-timeout-{}.sock", std::process::id()));
+            std::env::temp_dir().join(format!("syt-status-timeout-{}.sock", std::process::id()));
         let listener = crate::ipc::bind_private_local_listener(&path).unwrap();
         let server = std::thread::spawn(move || {
             let stream = listener.accept().unwrap();
@@ -284,7 +286,7 @@ mod tests {
 
     #[test]
     fn socket_path_target_uses_explicit_path() {
-        let path = PathBuf::from("/tmp/herdr-test.sock");
+        let path = PathBuf::from("/tmp/syt-test.sock");
         let client = ApiClient::for_target(ConnectionTarget::SocketPath(path.clone()));
         assert_eq!(client.socket_path(), path);
     }

@@ -16,7 +16,7 @@ impl MachineDiagnostics {
     pub(super) fn required_for(&self, endpoint: &ClientShellEndpoint) -> bool {
         self.errors
             .get(&endpoint.endpoint_id)
-            .is_some_and(|message| crate::remote::ssh_error_requires_authentication(message))
+            .is_some_and(|message| ssh_error_requires_authentication(message))
     }
 
     pub(super) fn badge_style(
@@ -33,6 +33,10 @@ impl MachineDiagnostics {
             style
         }
     }
+}
+
+fn ssh_error_requires_authentication(message: &str) -> bool {
+    message.contains("Permission denied")
 }
 
 /// Saved machines wait out a reconnect backoff whenever they are not online or disabled.
@@ -178,10 +182,10 @@ impl ClientShellState {
             return;
         };
         let code = machine_diagnostic_code(profile_id);
-        let command = if crate::remote::ssh_error_requires_authentication(error) {
-            format!("herdr machine reconnect {profile_id}")
+        let command = if ssh_error_requires_authentication(error) {
+            format!("sy-term machine reconnect {profile_id}")
         } else {
-            format!("herdr machine status {profile_id}")
+            format!("sy-term machine status {profile_id}")
         };
         // A requested retry can report its diagnostic, but must not replace another notice.
         if self

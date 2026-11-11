@@ -139,44 +139,6 @@ impl EndpointSupervisors {
         }
     }
 
-    pub(crate) fn reconcile_profiles(
-        &mut self,
-        profiles: &[super::SavedSshEndpoint],
-        now: Instant,
-    ) -> Vec<ClientEndpointId> {
-        let mut retired = Vec::new();
-        let retiring = &mut self.retired;
-        self.endpoints.retain(|endpoint_id, state| {
-            let ConnectTarget::Ssh(previous) = &state.target else {
-                return true;
-            };
-            let keep = profiles.iter().any(|profile| {
-                profile.id == previous.id
-                    && profile.enabled
-                    && profile.target == previous.target
-                    && profile.session == previous.session
-            });
-            if !keep {
-                retired.push(endpoint_id.clone());
-                // A stale Connected event still owns its bridge until the client rejects it.
-                if !state.completed.load(Ordering::Acquire) {
-                    retiring
-                        .entry(endpoint_id.clone())
-                        .or_insert_with(|| Arc::clone(&state.completed));
-                }
-            }
-            keep
-        });
-        for profile in profiles.iter().filter(|profile| profile.enabled) {
-            let state = self
-                .endpoints
-                .entry(ClientEndpointId::Ssh(profile.id.clone()))
-                .or_insert_with(|| ReconnectState::new(ConnectTarget::Ssh(profile.clone()), now));
-            state.target = ConnectTarget::Ssh(profile.clone());
-        }
-        retired
-    }
-
     pub(crate) fn spawn_due(
         &mut self,
         now: Instant,
@@ -474,13 +436,13 @@ fn connect_once(
             (stream, Box::new(()))
         }
         ConnectTarget::Ssh(profile) => {
-            let connected = crate::remote::connect_saved_ssh(
-                profile.id.as_str(),
-                &profile.target,
-                &profile.session,
-                Arc::clone(&cancelled),
-            )?;
-            (connected.stream, Box::new(connected.bridge))
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                format!(
+                    "machine '{}': remote machines are not supported in this build",
+                    profile.label
+                ),
+            ));
         }
     };
     let handshake = super::super::do_handshake(
@@ -538,7 +500,7 @@ fn connect_once(
 }
 
 fn failure_needs_attention(error: &std::io::Error) -> bool {
-    crate::remote::saved_ssh_failure_needs_attention(error)
+    error.kind() == std::io::ErrorKind::Unsupported
 }
 
 fn handshake_error(error: crate::client::ClientError) -> std::io::Error {
@@ -592,7 +554,9 @@ mod tests {
     async fn replacement_waits_for_queued_connection_teardown() {
         use crate::protocol::endpoint::{EndpointServerWelcome, ENDPOINT_WELCOME_KIND};
         use crate::protocol::{self, ClientMessage, ServerMessage};
-        use interprocess::local_socket::traits::{Listener as _, Stream as _};
+        #[cfg(unix)]
+        use interprocess::local_socket::traits::Listener as _;
+        use interprocess::local_socket::traits::Stream as _;
         let path = std::env::temp_dir().join(format!("hretired-{}.sock", std::process::id()));
         let listener = crate::ipc::bind_private_local_listener(&path).unwrap();
         let now = Instant::now();
@@ -672,7 +636,9 @@ mod tests {
     async fn wake_replacement_waits_for_the_obsolete_attempt_to_close() {
         use crate::platform::HostPowerEvent::*;
         use crate::protocol::{self, ClientMessage};
-        use interprocess::local_socket::traits::{Listener as _, Stream as _};
+        #[cfg(unix)]
+        use interprocess::local_socket::traits::Listener as _;
+        use interprocess::local_socket::traits::Stream as _;
         for observed_suspend in [true, false] {
             let path = std::env::temp_dir().join(format!(
                 "hwake-{}-{observed_suspend}.sock",
@@ -759,7 +725,9 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn retiring_or_shutting_down_a_silent_attempt_closes_its_connection() {
         use crate::protocol::{self, ClientMessage};
-        use interprocess::local_socket::traits::{Listener as _, Stream as _};
+        #[cfg(unix)]
+        use interprocess::local_socket::traits::Listener as _;
+        use interprocess::local_socket::traits::Stream as _;
         for shutdown in [false, true] {
             let path = std::env::temp_dir()
                 .join(format!("hcancel-{}-{shutdown}.sock", std::process::id()));
@@ -822,219 +790,6 @@ mod tests {
             session: "agents".into(),
             enabled: true,
         }
-    }
-
-    #[test]
-    fn live_catalog_preserves_renamed_connections_and_local_recovery() {
-        let now = Instant::now();
-        let mut profile = profile();
-        let id = ClientEndpointId::Ssh(profile.id.clone());
-        let mut supervisors = EndpointSupervisors::new(&[profile.clone()], now);
-        supervisors.add_local(PathBuf::from("local"), Some(1), now);
-        let state = supervisors.endpoints.get_mut(&id).unwrap();
-        state.generation = Some(7);
-        state.attempts = 3;
-        state.next_attempt = Some(now + Duration::from_secs(4));
-        profile.label = "Renamed".into();
-        assert!(supervisors.reconcile_profiles(&[profile], now).is_empty());
-        let state = &supervisors.endpoints[&id];
-        assert_eq!(state.generation, Some(7));
-        assert_eq!(state.attempts, 3);
-        assert_eq!(state.next_attempt, Some(now + Duration::from_secs(4)));
-        assert_eq!(
-            supervisors.endpoints[&ClientEndpointId::Local].generation,
-            Some(1)
-        );
-    }
-
-    #[test]
-    fn live_catalog_add_disable_enable_and_remove_fence_late_connections() {
-        let now = Instant::now();
-        let mut profile = profile();
-        let id = ClientEndpointId::Ssh(profile.id.clone());
-        let mut supervisors = EndpointSupervisors::new(&[], now);
-        assert!(supervisors
-            .reconcile_profiles(&[profile.clone()], now)
-            .is_empty());
-        assert_eq!(supervisors.endpoints[&id].next_attempt, Some(now));
-        supervisors.endpoints.get_mut(&id).unwrap().generation = Some(7);
-        supervisors.next_generation = 8;
-        profile.enabled = false;
-        assert_eq!(
-            supervisors.reconcile_profiles(&[profile.clone()], now),
-            vec![id.clone()]
-        );
-        assert!(!supervisors.record_status(&id, 7, ClientEndpointStatus::Online, now));
-        profile.enabled = true;
-        assert!(supervisors
-            .reconcile_profiles(&[profile.clone()], now)
-            .is_empty());
-        assert!(!supervisors.record_status(&id, 7, ClientEndpointStatus::Online, now));
-        assert_eq!(supervisors.next_generation, 8);
-        assert_eq!(supervisors.reconcile_profiles(&[], now), vec![id.clone()]);
-        assert!(!supervisors.record_status(&id, 7, ClientEndpointStatus::Online, now));
-    }
-
-    #[test]
-    fn live_catalog_destination_change_retires_only_that_machine() {
-        let now = Instant::now();
-        let mut changed = profile();
-        let other = super::super::SavedSshEndpoint::new("Other", "other", "main").unwrap();
-        let id = ClientEndpointId::Ssh(changed.id.clone());
-        let other_id = ClientEndpointId::Ssh(other.id.clone());
-        let mut supervisors = EndpointSupervisors::new(&[changed.clone(), other.clone()], now);
-        supervisors.endpoints.get_mut(&id).unwrap().generation = Some(2);
-        supervisors.endpoints.get_mut(&other_id).unwrap().generation = Some(3);
-        changed.session = "another-session".into();
-        assert_eq!(
-            supervisors.reconcile_profiles(&[changed, other], now),
-            vec![id.clone()]
-        );
-        assert_eq!(supervisors.endpoints[&id].generation, None);
-        assert_eq!(supervisors.endpoints[&other_id].generation, Some(3));
-    }
-
-    #[test]
-    fn brief_ssh_reconnections_do_not_reset_backoff() {
-        let now = Instant::now();
-        let profile = profile();
-        let id = ClientEndpointId::Ssh(profile.id.clone());
-        let mut supervisors = EndpointSupervisors::new(&[profile], now);
-        supervisors.endpoints.get_mut(&id).unwrap().generation = Some(2);
-        for attempt in 1..=5 {
-            let connected = now + Duration::from_secs(attempt * 20);
-            assert!(supervisors.record_status(&id, 2, ClientEndpointStatus::Online, connected));
-            supervisors.mark_ready(&id, 2, connected);
-            let failed = connected + Duration::from_secs(15);
-            assert!(supervisors.disconnected(&id, 2, failed));
-            assert_eq!(
-                supervisors.endpoints[&id].next_attempt,
-                Some(failed + INITIAL_RETRY_DELAY * (1 << (attempt - 1)))
-            );
-        }
-        let connected = now + Duration::from_secs(200);
-        assert!(supervisors.record_status(&id, 2, ClientEndpointStatus::Online, connected));
-        supervisors.mark_ready(&id, 1, connected);
-        let ready = connected + Duration::from_secs(45);
-        supervisors.mark_ready(&id, 2, ready);
-        let failed = connected + Duration::from_secs(60);
-        assert!(supervisors.disconnected(&id, 2, failed));
-        assert_eq!(
-            supervisors.endpoints[&id].next_attempt,
-            Some(failed + Duration::from_secs(16))
-        );
-
-        let connected = now + Duration::from_secs(300);
-        assert!(supervisors.record_status(&id, 2, ClientEndpointStatus::Online, connected));
-        let ready = connected + Duration::from_secs(45);
-        supervisors.mark_ready(&id, 2, ready);
-        supervisors.mark_ready(&id, 2, ready + Duration::from_secs(30));
-        let failed = ready + Duration::from_secs(60);
-        assert!(supervisors.disconnected(&id, 2, failed));
-        assert_eq!(
-            supervisors.endpoints[&id].next_attempt,
-            Some(failed + INITIAL_RETRY_DELAY)
-        );
-    }
-
-    #[test]
-    fn a_handshake_without_readiness_does_not_reset_backoff() {
-        let now = Instant::now();
-        let profile = profile();
-        let id = ClientEndpointId::Ssh(profile.id.clone());
-        let mut supervisors = EndpointSupervisors::new(&[profile], now);
-        let state = supervisors.endpoints.get_mut(&id).unwrap();
-        state.generation = Some(2);
-        state.attempts = 9;
-        assert!(supervisors.record_status(&id, 2, ClientEndpointStatus::Online, now));
-        let failed = now + Duration::from_secs(75);
-        assert!(supervisors.disconnected(&id, 2, failed));
-        assert_eq!(
-            supervisors.endpoints[&id].next_attempt,
-            Some(failed + MAX_RETRY_DELAY)
-        );
-    }
-
-    #[test]
-    fn requested_retry_skips_backoff_without_duplicating_attempts() {
-        let now = Instant::now();
-        let profile = profile();
-        let id = ClientEndpointId::Ssh(profile.id.clone());
-        let mut supervisors = EndpointSupervisors::new(&[profile], now);
-        let state = supervisors.endpoints.get_mut(&id).unwrap();
-        state.generation = Some(2);
-        state.attempts = 9;
-        assert!(supervisors.disconnected(&id, 2, now));
-        assert_eq!(
-            supervisors.endpoints[&id].next_attempt,
-            Some(now + MAX_RETRY_DELAY)
-        );
-
-        let clicked = now + Duration::from_secs(5);
-        assert!(supervisors.retry_now(&id, clicked));
-        assert_eq!(supervisors.endpoints[&id].next_attempt, Some(clicked));
-        // A failed requested attempt resumes from the shortest delay.
-        assert!(supervisors.disconnected(&id, 2, clicked));
-        assert_eq!(
-            supervisors.endpoints[&id].next_attempt,
-            Some(clicked + INITIAL_RETRY_DELAY)
-        );
-
-        supervisors.endpoints.get_mut(&id).unwrap().in_flight = true;
-        assert!(!supervisors.retry_now(&id, clicked));
-        assert!(supervisors.record_status(&id, 2, ClientEndpointStatus::Online, clicked));
-        assert!(!supervisors.retry_now(&id, clicked));
-        assert!(supervisors.endpoints[&id].next_attempt.is_none());
-    }
-
-    #[test]
-    fn interactive_wake_retries_slow_wifi_without_renewing_the_window_or_failure_history() {
-        use crate::platform::HostPowerEvent::*;
-        let now = Instant::now();
-        let profile = profile();
-        let id = ClientEndpointId::Ssh(profile.id.clone());
-        let mut supervisors = EndpointSupervisors::new(&[profile], now);
-        let state = supervisors.endpoints.get_mut(&id).unwrap();
-        state.generation = Some(2);
-        state.attempts = 9;
-        state.next_attempt = Some(now + Duration::from_secs(120));
-        supervisors.host_power_event(Suspend, now);
-        assert!(supervisors.host_power_event(AutomaticResume, now));
-        assert_eq!(
-            supervisors.endpoints[&id].next_attempt,
-            Some(now + Duration::from_secs(120))
-        );
-        assert!(supervisors.host_power_event(InteractiveResume, now));
-        assert_eq!(supervisors.endpoints[&id].next_attempt, Some(now));
-        assert_eq!(supervisors.endpoints[&id].attempts, 9);
-        // Wi-Fi remains unavailable for twenty seconds after the interactive wake.
-        for seconds in (0..=20).step_by(2) {
-            let failed = now + Duration::from_secs(seconds);
-            assert!(supervisors.disconnected(&id, 2, failed));
-            assert_eq!(
-                supervisors.endpoints[&id].next_attempt,
-                Some(failed + Duration::from_secs(2))
-            );
-        }
-        let failures = supervisors.endpoints[&id].attempts;
-        let late = now + Duration::from_secs(31);
-        for event in [
-            AutomaticResume,
-            InteractiveResume,
-            UnclassifiedResume,
-            InteractiveResume,
-        ] {
-            assert!(!supervisors.host_power_event(event, late));
-        }
-        supervisors.disconnected(&id, 2, late);
-        assert_eq!(supervisors.endpoints[&id].attempts, failures + 1);
-        assert_eq!(
-            supervisors.endpoints[&id].next_attempt,
-            Some(late + Duration::from_secs(120))
-        );
-        supervisors.host_power_event(Suspend, late);
-        assert!(supervisors.host_power_event(InteractiveResume, late));
-        assert_eq!(supervisors.endpoints[&id].next_attempt, Some(late));
     }
 
     #[test]
@@ -1188,5 +943,148 @@ mod tests {
             supervisors.endpoints[&endpoint_id].next_attempt,
             Some(now + Duration::from_secs(30))
         );
+    }
+
+    #[test]
+    fn brief_ssh_reconnections_do_not_reset_backoff() {
+        let now = Instant::now();
+        let profile = profile();
+        let id = ClientEndpointId::Ssh(profile.id.clone());
+        let mut supervisors = EndpointSupervisors::new(&[profile], now);
+        supervisors.endpoints.get_mut(&id).unwrap().generation = Some(2);
+        for attempt in 1..=5 {
+            let connected = now + Duration::from_secs(attempt * 20);
+            assert!(supervisors.record_status(&id, 2, ClientEndpointStatus::Online, connected));
+            supervisors.mark_ready(&id, 2, connected);
+            let failed = connected + Duration::from_secs(15);
+            assert!(supervisors.disconnected(&id, 2, failed));
+            assert_eq!(
+                supervisors.endpoints[&id].next_attempt,
+                Some(failed + INITIAL_RETRY_DELAY * (1 << (attempt - 1)))
+            );
+        }
+        let connected = now + Duration::from_secs(200);
+        assert!(supervisors.record_status(&id, 2, ClientEndpointStatus::Online, connected));
+        supervisors.mark_ready(&id, 1, connected);
+        let ready = connected + Duration::from_secs(45);
+        supervisors.mark_ready(&id, 2, ready);
+        let failed = connected + Duration::from_secs(60);
+        assert!(supervisors.disconnected(&id, 2, failed));
+        assert_eq!(
+            supervisors.endpoints[&id].next_attempt,
+            Some(failed + Duration::from_secs(16))
+        );
+
+        let connected = now + Duration::from_secs(300);
+        assert!(supervisors.record_status(&id, 2, ClientEndpointStatus::Online, connected));
+        let ready = connected + Duration::from_secs(45);
+        supervisors.mark_ready(&id, 2, ready);
+        supervisors.mark_ready(&id, 2, ready + Duration::from_secs(30));
+        let failed = ready + Duration::from_secs(60);
+        assert!(supervisors.disconnected(&id, 2, failed));
+        assert_eq!(
+            supervisors.endpoints[&id].next_attempt,
+            Some(failed + INITIAL_RETRY_DELAY)
+        );
+    }
+
+    #[test]
+    fn requested_retry_skips_backoff_without_duplicating_attempts() {
+        let now = Instant::now();
+        let profile = profile();
+        let id = ClientEndpointId::Ssh(profile.id.clone());
+        let mut supervisors = EndpointSupervisors::new(&[profile], now);
+        let state = supervisors.endpoints.get_mut(&id).unwrap();
+        state.generation = Some(2);
+        state.attempts = 9;
+        assert!(supervisors.disconnected(&id, 2, now));
+        assert_eq!(
+            supervisors.endpoints[&id].next_attempt,
+            Some(now + MAX_RETRY_DELAY)
+        );
+
+        let clicked = now + Duration::from_secs(5);
+        assert!(supervisors.retry_now(&id, clicked));
+        assert_eq!(supervisors.endpoints[&id].next_attempt, Some(clicked));
+        // A failed requested attempt resumes from the shortest delay.
+        assert!(supervisors.disconnected(&id, 2, clicked));
+        assert_eq!(
+            supervisors.endpoints[&id].next_attempt,
+            Some(clicked + INITIAL_RETRY_DELAY)
+        );
+
+        supervisors.endpoints.get_mut(&id).unwrap().in_flight = true;
+        assert!(!supervisors.retry_now(&id, clicked));
+        assert!(supervisors.record_status(&id, 2, ClientEndpointStatus::Online, clicked));
+        assert!(!supervisors.retry_now(&id, clicked));
+        assert!(supervisors.endpoints[&id].next_attempt.is_none());
+    }
+
+    #[test]
+    fn a_handshake_without_readiness_does_not_reset_backoff() {
+        let now = Instant::now();
+        let profile = profile();
+        let id = ClientEndpointId::Ssh(profile.id.clone());
+        let mut supervisors = EndpointSupervisors::new(&[profile], now);
+        let state = supervisors.endpoints.get_mut(&id).unwrap();
+        state.generation = Some(2);
+        state.attempts = 9;
+        assert!(supervisors.record_status(&id, 2, ClientEndpointStatus::Online, now));
+        let failed = now + Duration::from_secs(75);
+        assert!(supervisors.disconnected(&id, 2, failed));
+        assert_eq!(
+            supervisors.endpoints[&id].next_attempt,
+            Some(failed + MAX_RETRY_DELAY)
+        );
+    }
+
+    #[test]
+    fn interactive_wake_retries_slow_wifi_without_renewing_the_window_or_failure_history() {
+        use crate::platform::HostPowerEvent::*;
+        let now = Instant::now();
+        let profile = profile();
+        let id = ClientEndpointId::Ssh(profile.id.clone());
+        let mut supervisors = EndpointSupervisors::new(&[profile], now);
+        let state = supervisors.endpoints.get_mut(&id).unwrap();
+        state.generation = Some(2);
+        state.attempts = 9;
+        state.next_attempt = Some(now + Duration::from_secs(120));
+        supervisors.host_power_event(Suspend, now);
+        assert!(supervisors.host_power_event(AutomaticResume, now));
+        assert_eq!(
+            supervisors.endpoints[&id].next_attempt,
+            Some(now + Duration::from_secs(120))
+        );
+        assert!(supervisors.host_power_event(InteractiveResume, now));
+        assert_eq!(supervisors.endpoints[&id].next_attempt, Some(now));
+        assert_eq!(supervisors.endpoints[&id].attempts, 9);
+        // Wi-Fi remains unavailable for twenty seconds after the interactive wake.
+        for seconds in (0..=20).step_by(2) {
+            let failed = now + Duration::from_secs(seconds);
+            assert!(supervisors.disconnected(&id, 2, failed));
+            assert_eq!(
+                supervisors.endpoints[&id].next_attempt,
+                Some(failed + Duration::from_secs(2))
+            );
+        }
+        let failures = supervisors.endpoints[&id].attempts;
+        let late = now + Duration::from_secs(31);
+        for event in [
+            AutomaticResume,
+            InteractiveResume,
+            UnclassifiedResume,
+            InteractiveResume,
+        ] {
+            assert!(!supervisors.host_power_event(event, late));
+        }
+        supervisors.disconnected(&id, 2, late);
+        assert_eq!(supervisors.endpoints[&id].attempts, failures + 1);
+        assert_eq!(
+            supervisors.endpoints[&id].next_attempt,
+            Some(late + Duration::from_secs(120))
+        );
+        supervisors.host_power_event(Suspend, late);
+        assert!(supervisors.host_power_event(InteractiveResume, late));
+        assert_eq!(supervisors.endpoints[&id].next_attempt, Some(late));
     }
 }

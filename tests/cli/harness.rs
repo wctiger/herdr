@@ -20,21 +20,6 @@ pub(super) fn unique_test_dir() -> PathBuf {
     PathBuf::from(format!("/tmp/hcli-{}-{nanos}", std::process::id()))
 }
 
-pub(super) fn managed_github_plugin_dir(config_home: &Path) -> PathBuf {
-    config_home
-        .join("herdr-dev")
-        .join("plugins")
-        .join("github-installations")
-}
-
-pub(super) fn path_missing_or_empty(path: &Path) -> bool {
-    match fs::read_dir(path) {
-        Ok(mut entries) => entries.next().is_none(),
-        Err(err) if err.kind() == std::io::ErrorKind::NotFound => true,
-        Err(err) => panic!("failed to read {}: {err}", path.display()),
-    }
-}
-
 pub(super) fn run_git(repo: &Path, args: &[&str]) {
     let status = Command::new("git")
         .arg("-C")
@@ -53,8 +38,8 @@ pub(super) fn run_git(repo: &Path, args: &[&str]) {
 pub(super) fn create_committed_repo(path: &Path) {
     fs::create_dir_all(path).unwrap();
     run_git(path, &["init", "--quiet"]);
-    run_git(path, &["config", "user.email", "herdr@example.invalid"]);
-    run_git(path, &["config", "user.name", "Herdr Test"]);
+    run_git(path, &["config", "user.email", "sy-term@example.invalid"]);
+    run_git(path, &["config", "user.name", "sy-term Test"]);
     fs::write(path.join("README.md"), "test\n").unwrap();
     run_git(path, &["add", "README.md"]);
     run_git(path, &["commit", "--quiet", "-m", "initial"]);
@@ -146,9 +131,9 @@ pub(super) fn spawn_herdr_with_pane_history(
 
 pub(super) fn app_dir_name() -> &'static str {
     if cfg!(debug_assertions) {
-        "herdr-dev"
+        "sy-term-dev"
     } else {
-        "herdr"
+        "sy-term"
     }
 }
 
@@ -157,7 +142,7 @@ pub(super) fn named_session_socket(config_home: &Path, session: &str) -> PathBuf
         .join(app_dir_name())
         .join("sessions")
         .join(session)
-        .join("herdr.sock")
+        .join("sy-term.sock")
 }
 
 pub(super) fn spawn_named_server(
@@ -174,7 +159,7 @@ pub(super) fn spawn_named_server(
     )
     .unwrap();
 
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sy-term"));
     command
         .args(["--session", session, "server"])
         .env("XDG_CONFIG_HOME", config_home)
@@ -226,7 +211,7 @@ pub(super) fn run_named_cli_with_env_and_socket_override(
     envs: &[(&str, &Path)],
     socket_override: Option<&Path>,
 ) -> std::process::Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sy-term"));
     command
         .args(args)
         .env("XDG_CONFIG_HOME", config_home)
@@ -252,7 +237,7 @@ pub(super) fn run_named_cli_json(
     let output = run_named_cli(config_home, runtime_dir, args);
     assert!(
         output.status.success(),
-        "command failed: herdr {}\nstatus: {:?}\nstderr: {}\nstdout: {}",
+        "command failed: sy-term {}\nstatus: {:?}\nstderr: {}\nstdout: {}",
         args.join(" "),
         output.status.code(),
         String::from_utf8_lossy(&output.stderr),
@@ -301,7 +286,7 @@ pub(super) fn spawn_herdr_with_config(
         })
         .unwrap();
 
-    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut cmd = CommandBuilder::new(env!("CARGO_BIN_EXE_sy-term"));
     isolate_herdr_test_process(&mut cmd);
     cmd.arg("server");
     cmd.env("XDG_CONFIG_HOME", config_home);
@@ -323,7 +308,7 @@ pub(super) fn spawn_herdr_with_config(
 }
 
 pub(super) fn run_cli(socket_path: &Path, args: &[&str]) -> std::process::Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sy-term"));
     command.args(args);
     command.env("HERDR_SOCKET_PATH", socket_path);
     command.output().unwrap()
@@ -334,7 +319,7 @@ pub(super) fn run_cli_in_dir(
     args: &[&str],
     current_dir: &Path,
 ) -> std::process::Output {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_herdr"));
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sy-term"));
     command.args(args);
     command.current_dir(current_dir);
     command.env("HERDR_SOCKET_PATH", socket_path);
@@ -378,7 +363,7 @@ pub(super) fn parse_cli_json_output(
 ) -> serde_json::Value {
     assert!(
         output.status.success(),
-        "command failed: herdr {}\nstatus: {:?}\nstderr: {}\nstdout: {}",
+        "command failed: sy-term {}\nstatus: {:?}\nstderr: {}\nstdout: {}",
         args.join(" "),
         output.status.code(),
         String::from_utf8_lossy(&output.stderr),
@@ -387,7 +372,7 @@ pub(super) fn parse_cli_json_output(
 
     serde_json::from_slice(&output.stdout).unwrap_or_else(|err| {
         panic!(
-            "failed to parse JSON response for `herdr {}`: {}\nstdout: {}\nstderr: {}",
+            "failed to parse JSON response for `sy-term {}`: {}\nstdout: {}\nstderr: {}",
             args.join(" "),
             err,
             String::from_utf8_lossy(&output.stdout),
