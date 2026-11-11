@@ -1,0 +1,97 @@
+name: Windows build
+
+# Builds a release sy-term.exe for Windows x64 and uploads it as a
+# downloadable artifact. Runs on pull requests, pushes to master, and on
+# demand from the Actions tab ("Run workflow").
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  RUST_TOOLCHAIN_VERSION: 1.96.1
+  ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.zig-cache
+  ZIG_LOCAL_CACHE_DIR: ${{ github.workspace }}/.zig-cache
+
+concurrency:
+  group: windows-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build sy-term.exe (x86_64)
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN_VERSION }}
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install Zig
+        uses: vercel-labs/setup-zig@83c1594f26b86da8a9a8ddd9b5ee5f3af0f96943 # v1.0.2
+        with:
+          version: 0.16.0
+
+      - name: Restore Cargo cache
+        uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+        with:
+          cache-bin: false
+          key: windows-release-build
+          save-if: ${{ github.event_name == 'push' }}
+
+      - name: Build release binary
+        run: cargo build --release --locked --target x86_64-pc-windows-msvc
+
+      - name: Check the binary runs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exe = "target\x86_64-pc-windows-msvc\release\sy-term.exe"
+          & $exe --version
+          if ($LASTEXITCODE -ne 0) { throw "sy-term --version failed with exit code $LASTEXITCODE" }
+
+      - name: Package with bundled ConPTY
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $package = Join-Path $env:RUNNER_TEMP "Microsoft.Windows.Console.ConPTY.nupkg"
+          $stage = Join-Path $env:RUNNER_TEMP "sy-term-windows-x86_64"
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          .\scripts\package_windows_conpty.ps1 `
+            -HerdrExe target\x86_64-pc-windows-msvc\release\sy-term.exe `
+            -PackagePath $package `
+            -StageDir $stage `
+            -OutputPath dist\sy-term-windows-x86_64.zip
+          $version = (& target\x86_64-pc-windows-msvc\release\sy-term.exe --version)
+          $hash = (Get-FileHash -Algorithm SHA256 dist\sy-term-windows-x86_64.zip).Hash.ToLowerInvariant()
+          @(
+            "version=$version"
+            "commit=$env:GITHUB_SHA"
+            "ref=$env:GITHUB_REF"
+            "target=x86_64-pc-windows-msvc"
+            "sha256=$hash  sy-term-windows-x86_64.zip"
+          ) | Out-File -Encoding utf8 dist\BUILD_INFO.txt
+          Get-Content dist\BUILD_INFO.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: sy-term-windows-x86_64
+          path: |
+            dist/sy-term-windows-x86_64.zip
+            dist/BUILD_INFO.txt
+          if-no-files-found: error
+          retention-days: 14

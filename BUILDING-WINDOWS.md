@@ -4,6 +4,25 @@ This guide builds sy-term from source on a fresh Windows 10 (1809 or newer) or
 Windows 11 x64 machine and walks through a manual smoke test. Commands are for
 PowerShell unless noted.
 
+## Option A: download a CI build
+
+The **Windows build** workflow (`.github/workflows/windows-build.yml`) builds a
+release `sy-term.exe` on every pull request and push to `master`, and on demand
+from the repository's **Actions** tab (**Windows build** > **Run workflow**).
+
+1. Open the workflow run and download the `sy-term-windows-x86_64` artifact
+   (you need to be signed in to GitHub).
+2. Unzip it, then unzip `sy-term-windows-x86_64.zip` inside it into a folder of
+   your choice, for example `%LOCALAPPDATA%\Programs\sy-term`. Keep the
+   `conpty` folder next to `sy-term.exe`; it is the bundled Microsoft ConPTY
+   that sy-term verifies at startup.
+3. `BUILD_INFO.txt` records the commit and the zip's SHA-256.
+
+Then continue at [Run it](#4-run-it). Windows SmartScreen may warn about an
+unsigned executable; choose **More info** > **Run anyway** if you trust the build.
+
+## Option B: build from source
+
 ## 1. Install the prerequisites
 
 1. **Git for Windows**: <https://git-scm.com/download/win>.
